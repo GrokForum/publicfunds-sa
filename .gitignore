@@ -1,0 +1,33 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+secrets/
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# Data (large / reproducible from sources; backed up separately per D-05)
+data/
+src/
+dist/
+*.duckdb
+*.duckdb.wal
+*.parquet
+*.jsonl.gz
+# Build artefacts
+docs/**/*.html
+!thusa/review/templates/*.html
+*.html
+!thusa/review/templates/*.html
+# OS
+.DS_Store
+!apps/public-dashboard/*.html
+!/index.html
+# State backups (CHG-2026-044): never commit. Default location is outside the repo.
+publicfunds-backups/
+
+# POPIA name list, plain text, local only (CHG-2026-049)
+.popia-names.local

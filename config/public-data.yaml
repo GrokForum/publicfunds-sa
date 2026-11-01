@@ -1,0 +1,43 @@
+# Public data export (pf publish-data -> public-data/v1/, CHG-2026-006, ADR-0010).
+# Plain-language text shown on the public dashboard. Changing what is exported is a Normal-high change.
+schema_version: "1.0.0"
+base_url: "https://publicfunds.grokforum.site/public-data/v1/"
+site_url: "https://publicfunds.grokforum.site/apps/public-dashboard/"   # public dashboard (custom domain, CHG-2026-012)
+size_budget_bytes: 5000000        # all files together (tests enforce it)
+file_budget_bytes: 2000000        # any single file
+detectors:
+  D1_overspend_vs_budget: "Spent much more than the approved budget (audited spending compared with the budget)."
+  D3_restricted_supplier_awarded: "A tender award went to a name on National Treasury's restricted-supplier list while the restriction applied."
+  D4_supplier_concentration: "One supplier won most of a buyer's tender value over three years."
+  D5_award_value_gaps: "Many of a buyer's published tender awards have no value, or an obviously wrong value such as R0."
+  D8_irregular_expenditure_trend: "Reported irregular expenditure rose sharply two years in a row."
+  D13_fuel_unit_price: "A payment for fuel works out at a much higher price per litre than the official fuel price at the time (reviewed internally; not published)."
+  D6_threshold_splitting: "Several awards by one buyer to one supplier close together, each below the competitive-bidding limit but together above it. Never published."
+  D16_repeat_awards: "One buyer gave the same supplier many awards within a year. Never published."
+  D17_just_below_threshold: "Repeated awards by one buyer to one supplier just under the competitive-bidding limit. Never published."
+known_gaps:
+  - id: KE-006
+    text: "The latest financial year (2024/25) has no audited results, irregular-expenditure figures or audit opinions in the Municipal Money data yet."
+  - id: KE-007
+    text: "Many published tender awards have no value or a R0 placeholder (the share is shown per buyer); we show these as unknown, never as zero."
+  - id: KE-009
+    text: "Payments by national and provincial departments (the Procurement Payments Dashboard) can only be exported by hand and are not loaded yet."
+  - id: KE-003
+    text: "Statistics South Africa's website blocks automated downloads, so inflation (CPI) comes from the IMF's republication of Stats SA headline CPI (all urban areas); the OECD copy is used only as a fallback. Values from 2025-01 match Stats SA P0141. Earlier values are the IMF's linked back-series (OECD 2015-base series scaled) and can differ from Stats SA's rebased figures by about 0.1-0.2 index points. Population figures are not loaded yet."
+  - id: KE-001
+    text: "The eTenders live API often fails; tender data comes from the monthly bulk file plus whatever recent updates the API returned."
+  - id: KE-012
+    text: "No fuel month is missing between January 2019 and the latest month. Values are shown as published; where DMPR's own figures are known to differ, see the known errors KE-014 and KE-015. Fuel prices come from the Department of Mineral and Petroleum Resources' (DMPR) yearly price history tables. Earlier yearly tables are not at the address DMPR uses for the 2019-2025 tables (HTTP 404), so history starts in January 2019. December 2025 is not in any history table (the November 2025 table has an empty December row, and no December 2025 history table is published at that address); it is read from DMPR's December 2025 fuel regulations workbook, and the source is linked in each row."
+population:
+  status: unknown
+  reason: "Population and household counts per municipality (Stats SA Census 2022) are not loaded yet: the Stats SA website blocks automated downloads (KE-003)."
+display_sources:
+  # licence / human link per source id (adds to config/sources.yaml)
+  muni_api: {page: "https://municipalmoney.gov.za/", licence: "Municipal Money terms of use (attribute National Treasury)"}
+  etenders_ocds: {page: "https://data.etenders.gov.za/", licence: "CC BY 4.0 (portal) / PDDL (API spec): attribute National Treasury"}
+  rsr: {page: "https://ocpo.treasury.gov.za/", licence: "Public register (National Treasury); used only to count leads, never published here"}
+  nt_budget: {page: "https://vulekamali.gov.za/datasets/budgeted-and-actual-national-expenditure", licence: "Vulekamali open data (attribute National Treasury)"}
+  ppd_payments: {page: "https://data.etenders.gov.za/", licence: "National Treasury OCPO"}
+  dmpr_fuel: {page: "https://www.dmpr.gov.za/Branches/Petroleum-Resources/Fuel-Prices", licence: "Public government information (DMPR / CEF). Source: DMPR, https://www.dmpr.gov.za/Terms-Conditions; (c) Department of Mineral and Petroleum Resources; reproduced as published; no commercial use"}
+  imf_cpi: {page: "https://data.imf.org/en/datasets/IMF.STA:CPI", licence: "Source: International Monetary Fund, Consumer Price Index (CPI), https://data.imf.org/en/datasets/IMF.STA:CPI; IMF terms for statistical data; underlying data: Stats SA headline CPI (all urban areas)"}
+  oecd_cpi: {page: "https://data-explorer.oecd.org/", licence: "CC BY 4.0 (OECD); underlying data: Statistics South Africa"}

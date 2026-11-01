@@ -1,0 +1,499 @@
+{
+ "schema": "publicfunds.public-data/v1",
+ "schema_version": "1.0.0",
+ "kind": "manifest",
+ "generated_at_sast": "2026-11-01T03:15:24+02:00",
+ "build": {
+  "id": "B20261101T011413Z",
+  "as_of": "2026-11-01",
+  "code_commit": "c8d7d90",
+  "data_quality": {
+   "pass": 58,
+   "warn": 1,
+   "fail": 0
+  }
+ },
+ "base_url": "https://publicfunds.grokforum.site/public-data/v1/",
+ "files": [
+  {
+   "name": "awards-2017.json",
+   "bytes": 2723,
+   "sha256": "43810c5f900f0051b8c7aa787f8b035c80f1745b5929d3c3c830612460c10b8e"
+  },
+  {
+   "name": "awards-2018.json",
+   "bytes": 1478,
+   "sha256": "4b591533aa9f0677c10342c9ef5a8ea4fa0aef3e761bb940625d5563f50d1055"
+  },
+  {
+   "name": "awards-2019.json",
+   "bytes": 2120,
+   "sha256": "d6cbf6f7d3327c9594feab62f162a9f339906678f22c9f40533e1c8c78f7888b"
+  },
+  {
+   "name": "awards-2020.json",
+   "bytes": 2731,
+   "sha256": "9da45d8bab5e8ed4ea6f7acbe7535b8e7a32a3bde7225b1d2f752582914cfae1"
+  },
+  {
+   "name": "awards-2021.json",
+   "bytes": 162554,
+   "sha256": "acb06bbb03c59941105ce1d5e679553840b97a19ec57e154ff8c7e7347b6f495"
+  },
+  {
+   "name": "awards-2022.json",
+   "bytes": 351779,
+   "sha256": "26baa3c768bbd445ca36c73f83d1f4d3b59f39c7f68174dbf68be075fb2ea084"
+  },
+  {
+   "name": "awards-2023.json",
+   "bytes": 476818,
+   "sha256": "6b9687ad72a942a3a5c2e1d13256ad546ed6865b0d86ab46d54d8e38e0c96421"
+  },
+  {
+   "name": "awards-2024.json",
+   "bytes": 562193,
+   "sha256": "90941e0dc3fd34e546b8b659b314e8556b0e05565ea54525184e9c9e248f3689"
+  },
+  {
+   "name": "awards-2025.json",
+   "bytes": 462877,
+   "sha256": "c5dacad3765c523934c950308185738bf0ff68db8153ccb7f8dd6238c21ebadd"
+  },
+  {
+   "name": "awards-2026.json",
+   "bytes": 235137,
+   "sha256": "8be2d68d098f076da3c9e1e724ebde9bbf6393d39c9bbec01db66707ceff65d7"
+  },
+  {
+   "name": "changes.json",
+   "bytes": 9931,
+   "sha256": "41d61e9a2fb734c88f50d1d394ef723e3091c4ee028d7ef4fd404d9f8b6cb2e8"
+  },
+  {
+   "name": "coverage.json",
+   "bytes": 76816,
+   "sha256": "df9e58e749d658c0230492e4d6d6b307b26068c02bd00bb19852c19aad2460ea"
+  },
+  {
+   "name": "departments.json",
+   "bytes": 46085,
+   "sha256": "77fc761e626af1d26e948324c925aac82827a0fbbe479c7aa5f105920ddab00c"
+  },
+  {
+   "name": "feed.json",
+   "bytes": 4754,
+   "sha256": "6104c07886194f69aa9989c749f507fa33be2abb0aac7e130cc89560b7c07e43"
+  },
+  {
+   "name": "flags.json",
+   "bytes": 2265,
+   "sha256": "0243b14cb6863cee4021465f856c951bbb17e93c7b80627c57831ffc69327b2b"
+  },
+  {
+   "name": "municipalities.json",
+   "bytes": 1525551,
+   "sha256": "521ab3fa7de64850776a7a95a648f1b50990eae8b8cb96fe715d39349c9a474e"
+  },
+  {
+   "name": "prices.json",
+   "bytes": 42175,
+   "sha256": "43e86cdc9ba0be259314485e4fce6899a802cb9a5b27f707affe7d5a0342e39a"
+  },
+  {
+   "name": "tenders-summary.json",
+   "bytes": 383099,
+   "sha256": "c32bb936cbde1f2b1f16d34e884633f002521278785263040ea51b7fa061001e"
+  }
+ ],
+ "counts": {
+  "municipalities": 292,
+  "departments": 49,
+  "awards": 9551,
+  "buyers": 488,
+  "fuel_rows": 658,
+  "cpi_months": 225,
+  "flags_confirmed": 0,
+  "leads_hidden": 349
+ },
+ "coverage": {
+  "applicable": 1542,
+  "complete": 1167,
+  "partial": 375,
+  "missing": 0,
+  "entities": 257,
+  "fye_min": 2020,
+  "fye_max": 2025,
+  "complete_pct": 75.7,
+  "by_type": {
+   "budget": {
+    "present": 1263,
+    "partial": 276,
+    "missing": 3,
+    "n.a.": 0,
+    "present_pct": 81.9
+   },
+   "actual_audited": {
+    "present": 1458,
+    "partial": 4,
+    "missing": 80,
+    "n.a.": 0,
+    "present_pct": 94.6
+   },
+   "uifw": {
+    "present": 1285,
+    "partial": 0,
+    "missing": 257,
+    "n.a.": 0,
+    "present_pct": 83.3
+   },
+   "audit_opinion": {
+    "present": 1238,
+    "partial": 47,
+    "missing": 257,
+    "n.a.": 0,
+    "present_pct": 80.3
+   },
+   "procurement": {
+    "present": 86,
+    "partial": 94,
+    "missing": 862,
+    "n.a.": 500,
+    "present_pct": 8.3
+   }
+  },
+  "by_year": [
+   {
+    "fye": 2020,
+    "fy": "2019/20",
+    "applicable": 257,
+    "complete": 232,
+    "all_core_due": true
+   },
+   {
+    "fye": 2021,
+    "fy": "2020/21",
+    "applicable": 257,
+    "complete": 228,
+    "all_core_due": true
+   },
+   {
+    "fye": 2022,
+    "fy": "2021/22",
+    "applicable": 257,
+    "complete": 240,
+    "all_core_due": true
+   },
+   {
+    "fye": 2023,
+    "fy": "2022/23",
+    "applicable": 257,
+    "complete": 232,
+    "all_core_due": true
+   },
+   {
+    "fye": 2024,
+    "fy": "2023/24",
+    "applicable": 257,
+    "complete": 235,
+    "all_core_due": true
+   },
+   {
+    "fye": 2025,
+    "fy": "2024/25",
+    "applicable": 257,
+    "complete": 0,
+    "all_core_due": true
+   },
+   {
+    "fye": 2026,
+    "fy": "2025/26",
+    "applicable": 257,
+    "complete": 255,
+    "all_core_due": false
+   }
+  ]
+ },
+ "sources": [
+  {
+   "id": "agsa_annexures",
+   "name": "AGSA general-report annexures 1 and 3 (Excel), MFMA and PFMA 2023-24",
+   "publisher": "Auditor-General of South Africa",
+   "page": "https://mfma-2024.agsa.co.za/",
+   "licence": null,
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:14:13+02:00",
+   "last_new_data_sast": "2026-10-20T08:05:11+02:00",
+   "last_checked_sast": "2026-10-20T08:05:11+02:00",
+   "raw_files": 4,
+   "freshness_slo_days": 400,
+   "problem": null
+  },
+  {
+   "id": "agsa_mfma",
+   "name": "AGSA MFMA 2024-25 microsite",
+   "publisher": "Auditor-General of South Africa",
+   "page": "https://mfma-2025.agsa.co.za/",
+   "licence": null,
+   "last_run_status": null,
+   "last_run_sast": null,
+   "last_new_data_sast": null,
+   "last_checked_sast": null,
+   "raw_files": 0,
+   "freshness_slo_days": 30,
+   "problem": "not loaded yet"
+  },
+  {
+   "id": "agsa_pfma",
+   "name": "AGSA PFMA general report + annexures",
+   "publisher": "Auditor-General of South Africa",
+   "page": "https://www.agsa.co.za/reports",
+   "licence": null,
+   "last_run_status": null,
+   "last_run_sast": null,
+   "last_new_data_sast": null,
+   "last_checked_sast": null,
+   "raw_files": 0,
+   "freshness_slo_days": 30,
+   "problem": "not loaded yet"
+  },
+  {
+   "id": "dmpr_fuel",
+   "name": "DMPR / CEF fuel price adjustments",
+   "publisher": "Department of Mineral and Petroleum Resources",
+   "page": "https://www.dmpr.gov.za/Branches/Petroleum-Resources/Fuel-Prices",
+   "licence": "Public government information (DMPR / CEF). Source: DMPR, https://www.dmpr.gov.za/Terms-Conditions; (c) Department of Mineral and Petroleum Resources; reproduced as published; no commercial use",
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:14:11+02:00",
+   "last_new_data_sast": "2026-10-25T03:12:18+02:00",
+   "last_checked_sast": "2026-11-01T03:14:11+02:00",
+   "raw_files": 9,
+   "freshness_slo_days": 35,
+   "problem": null
+  },
+  {
+   "id": "etenders_ocds",
+   "name": "eTenders OCDS (Transparency Portal bulk + API)",
+   "publisher": "National Treasury OCPO",
+   "page": "https://data.etenders.gov.za/",
+   "licence": "CC BY 4.0 (portal) / PDDL (API spec): attribute National Treasury",
+   "last_run_status": "partial",
+   "last_run_sast": "2026-11-01T03:10:10+02:00",
+   "last_new_data_sast": "2026-11-01T03:09:21+02:00",
+   "last_checked_sast": "2026-11-01T03:09:21+02:00",
+   "raw_files": 27,
+   "freshness_slo_days": 2,
+   "problem": "delta page 3: https://ocds-api.etenders.gov.za/api/OCDSReleases failed after 5 attempts: HTTP 500"
+  },
+  {
+   "id": "imf_cpi",
+   "name": "Stats SA headline CPI (all urban areas) (IMF CPI dataset republication, Dec 2024 = 100)",
+   "publisher": "International Monetary Fund (data from Statistics South Africa)",
+   "page": "https://data.imf.org/en/datasets/IMF.STA:CPI",
+   "licence": "Source: International Monetary Fund, Consumer Price Index (CPI), https://data.imf.org/en/datasets/IMF.STA:CPI; IMF terms for statistical data; underlying data: Stats SA headline CPI (all urban areas)",
+   "last_run_status": "ok",
+   "last_run_sast": "2026-11-01T03:14:13+02:00",
+   "last_new_data_sast": "2026-11-01T03:14:13+02:00",
+   "last_checked_sast": "2026-11-01T03:14:13+02:00",
+   "raw_files": 1,
+   "freshness_slo_days": 120,
+   "problem": null
+  },
+  {
+   "id": "muni_api",
+   "name": "Municipal Finance Data API (Municipal Money)",
+   "publisher": "National Treasury (maintained by OpenUp)",
+   "page": "https://municipalmoney.gov.za/",
+   "licence": "Municipal Money terms of use (attribute National Treasury)",
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:09:02+02:00",
+   "last_new_data_sast": "2026-10-23T03:05:05+02:00",
+   "last_checked_sast": "2026-11-01T03:09:02+02:00",
+   "raw_files": 17,
+   "freshness_slo_days": 7,
+   "problem": null
+  },
+  {
+   "id": "nt_budget",
+   "name": "Vulekamali / ENE / EPRE / s32 monthly statements",
+   "publisher": "National Treasury",
+   "page": "https://vulekamali.gov.za/datasets/budgeted-and-actual-national-expenditure",
+   "licence": "Vulekamali open data (attribute National Treasury)",
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:14:04+02:00",
+   "last_new_data_sast": "2026-10-19T09:38:04+02:00",
+   "last_checked_sast": "2026-11-01T03:14:04+02:00",
+   "raw_files": 1,
+   "freshness_slo_days": 10,
+   "problem": null
+  },
+  {
+   "id": "oecd_cpi",
+   "name": "Headline CPI for South Africa (Stats SA data, OECD republication)",
+   "publisher": "OECD (data from Statistics South Africa)",
+   "page": "https://data-explorer.oecd.org/",
+   "licence": "CC BY 4.0 (OECD); underlying data: Statistics South Africa",
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:14:11+02:00",
+   "last_new_data_sast": "2026-10-19T20:36:51+02:00",
+   "last_checked_sast": "2026-11-01T03:14:11+02:00",
+   "raw_files": 1,
+   "freshness_slo_days": 400,
+   "problem": null
+  },
+  {
+   "id": "ppd_payments",
+   "name": "Procurement Payments Dashboard (BAS + LOGIS) transaction list",
+   "publisher": "National Treasury OCPO",
+   "page": "https://data.etenders.gov.za/",
+   "licence": "National Treasury OCPO",
+   "last_run_status": "awaiting_manual_drop",
+   "last_run_sast": "2026-11-01T03:10:12+02:00",
+   "last_new_data_sast": null,
+   "last_checked_sast": null,
+   "raw_files": 0,
+   "freshness_slo_days": 21,
+   "problem": null
+  },
+  {
+   "id": "rsr",
+   "name": "Register of Restricted Suppliers",
+   "publisher": "National Treasury OCPO",
+   "page": "https://ocpo.treasury.gov.za/",
+   "licence": "Public register (National Treasury); used only to count leads, never published here",
+   "last_run_status": "unchanged",
+   "last_run_sast": "2026-11-01T03:10:12+02:00",
+   "last_new_data_sast": "2026-10-19T09:37:48+02:00",
+   "last_checked_sast": "2026-11-01T03:10:12+02:00",
+   "raw_files": 1,
+   "freshness_slo_days": 8,
+   "problem": null
+  },
+  {
+   "id": "s71_noncompliance",
+   "name": "MFMA s71 non-compliance lists",
+   "publisher": "National Treasury",
+   "page": "https://mfma.treasury.gov.za/",
+   "licence": null,
+   "last_run_status": null,
+   "last_run_sast": null,
+   "last_new_data_sast": null,
+   "last_checked_sast": null,
+   "raw_files": 0,
+   "freshness_slo_days": 21,
+   "problem": "not loaded yet"
+  },
+  {
+   "id": "statssa_cpi",
+   "name": "Stats SA CPI (incl. average prices), PPI, P0151.1",
+   "publisher": "Statistics South Africa",
+   "page": "https://www.statssa.gov.za/?page_id=1847",
+   "licence": null,
+   "last_run_status": null,
+   "last_run_sast": null,
+   "last_new_data_sast": null,
+   "last_checked_sast": null,
+   "raw_files": 0,
+   "freshness_slo_days": 10,
+   "problem": "WAF blocks scripted access -> manual drop (D-07)"
+  }
+ ],
+ "known_gaps": [
+  {
+   "id": "KE-006",
+   "text": "The latest financial year (2024/25) has no audited results, irregular-expenditure figures or audit opinions in the Municipal Money data yet."
+  },
+  {
+   "id": "KE-007",
+   "text": "Many published tender awards have no value or a R0 placeholder (the share is shown per buyer); we show these as unknown, never as zero."
+  },
+  {
+   "id": "KE-009",
+   "text": "Payments by national and provincial departments (the Procurement Payments Dashboard) can only be exported by hand and are not loaded yet."
+  },
+  {
+   "id": "KE-003",
+   "text": "Statistics South Africa's website blocks automated downloads, so inflation (CPI) comes from the IMF's republication of Stats SA headline CPI (all urban areas); the OECD copy is used only as a fallback. Values from 2025-01 match Stats SA P0141. Earlier values are the IMF's linked back-series (OECD 2015-base series scaled) and can differ from Stats SA's rebased figures by about 0.1-0.2 index points. Population figures are not loaded yet."
+  },
+  {
+   "id": "KE-001",
+   "text": "The eTenders live API often fails; tender data comes from the monthly bulk file plus whatever recent updates the API returned."
+  },
+  {
+   "id": "KE-012",
+   "text": "No fuel month is missing between January 2019 and the latest month. Values are shown as published; where DMPR's own figures are known to differ, see the known errors KE-014 and KE-015. Fuel prices come from the Department of Mineral and Petroleum Resources' (DMPR) yearly price history tables. Earlier yearly tables are not at the address DMPR uses for the 2019-2025 tables (HTTP 404), so history starts in January 2019. December 2025 is not in any history table (the November 2025 table has an empty December row, and no December 2025 history table is published at that address); it is read from DMPR's December 2025 fuel regulations workbook, and the source is linked in each row."
+  }
+ ],
+ "known_errors": [
+  {
+   "id": "KE-001",
+   "symptom": "ocds-api.etenders.gov.za/api/OCDSReleases returns HTTP 500 or times out (19 Oct 2026). Update 09:55: PageSize > 100 always 500; page 3 of a 35-day window 500s after retries"
+  },
+  {
+   "id": "KE-002",
+   "symptom": "data.vulekamali.gov.za CKAN returns 500/timeout; from 09:31 19 Oct 2026 TLS handshake fails (UNEXPECTED_EOF)"
+  },
+  {
+   "id": "KE-003",
+   "symptom": "Stats SA, some SIU/PP pages block or time out on scripted requests"
+  },
+  {
+   "id": "KE-004",
+   "symptom": "Instruction 10 PDF is image-only"
+  },
+  {
+   "id": "KE-005",
+   "symptom": "Municipal Finance API incexp (v1) members/financial_year_end returns HTTP 500"
+  },
+  {
+   "id": "KE-006",
+   "symptom": "Municipal Finance API has no 2024/25 UIF&W amounts or audit opinions (max FYE 2024 in both cubes, checked 19 Oct 2026) and no 2024/25 adjusted budgets (ADJB). AGSA MFMA 2024-25 results are on its microsite"
+  },
+  {
+   "id": "KE-007",
+   "symptom": "eTenders award values: 2,791 of 9,551 award-supplier rows have no value or a 0 placeholder; 330 are below R100 (e.g. R10); 44 are above R20bn (e.g. R370.8bn for one SANRAL contract)"
+  },
+  {
+   "id": "KE-008",
+   "symptom": "incexp_v2 subtotals (2900 total revenue, 4400 total expenditure) are published only for some years and amount types"
+  },
+  {
+   "id": "KE-009",
+   "symptom": "PPD transaction list is only exportable from inside the Power BI report"
+  },
+  {
+   "id": "KE-010",
+   "symptom": "Vulekamali BvA CSV has 14 lines in Excel scientific notation (e.g. 1,06087E+11), i.e. about 6 significant digits"
+  },
+  {
+   "id": "KE-011",
+   "symptom": "Municipal Finance API municipalities cube mixes province codes: current KwaZulu-Natal munis use KZ and some disestablished ones KZN; Limpopo uses LP and LIM (checked 19 Oct 2026)"
+  },
+  {
+   "id": "KE-012",
+   "symptom": "No fuel month is missing from 2019-01 to the latest month, but price benchmarks are partial: history starts 2019-01 (2015–2018 not at the DMPR path, HTTP 404). December 2025 is read from DMPR's December 2025 fuel regulations workbook, not a history table (CHG-2026-027)."
+  },
+  {
+   "id": "KE-013",
+   "symptom": "AGSA annexures (CHG-2026-011): (1) UIF&W columns are headed \"Amount R\" but hold R million (checked: 678 of 678 linked municipal amounts match the Municipal Finance API within R50 000, e.g. Cape Town 2023-24 irregular 634.3 vs R634 262 thousand); (2) MFMA 2024-25 annexures are pub…"
+  },
+  {
+   "id": "KE-014",
+   "symptom": "DMPR's 2022 history PDF prints October 2022 inland diesel 0.05% as 2406.00 c/l (September 2396.10; official change +10c); DMRE's 30 Sep 2022 statement (Annexure 1) gives Gauteng diesel 0.05% as 2,406.100 c/l, so DMPR's table is 0.10 c/l below DMRE's own figure."
+  },
+  {
+   "id": "KE-015",
+   "symptom": "On coast 95 petrol, DMPR's history PDF differs from DMPR's own fuel-regulations xlsx in five months. In two (Mar 2024: 2341 vs 2373; Jan 2025: 2055 vs 2080) the PDF's coast 95 equals the xlsx's coast 93 figure (Petrol sheet, 93 RON section, zone 1A). Others: CHG-2026-028."
+  }
+ ],
+ "population": {
+  "status": "unknown",
+  "reason": "Population and household counts per municipality (Stats SA Census 2022) are not loaded yet: the Stats SA website blocks automated downloads (KE-003)."
+ },
+ "disclaimers": [
+  "This site shows official public data as published, with its gaps. Blank means unknown, not zero.",
+  "Flags are automated indicators checked by people, not findings of wrongdoing. Only flags confirmed by review are shown; other leads stay hidden while they are checked.",
+  "Tender award records are public records published by National Treasury, shown as published."
+ ],
+ "freshness_slo": "Public data is refreshed after each successful daily pipeline run; target: no older than 48 hours (itil/sla-slo.md, SLO-PD-1)."
+}
