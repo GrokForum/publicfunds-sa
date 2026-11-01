@@ -17,7 +17,6 @@ import sys
 import threading
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))      # thusa.coverage_ceiling, wherever the script is started from
@@ -346,13 +345,32 @@ def check_by_type(page, vname, app, problems, cov, mun):
         say(f"page text could not be scanned for 'published' ({type(exc).__name__})")
 
 
-def check_gap_lines(page, vname, app, problems, cov):
+def projection_status(cov) -> tuple[bool, str]:
+    """CHG-2026-046: is a projection line expected, from coverage.json alone (not from the code under test)? Returns (expected, reason).
+    Expected when the year after the headline window is in by_year with all_core_due false, and the window has at least one gap year."""
+    h = cov["headline"]
+    nxt = {y["fye"]: y for y in h.get("by_year") or []}.get(h["fye_max"] + 1)
+    if not nxt:
+        return False, f"SKIP projection check: coverage.json has no by_year entry for FYE {h['fye_max'] + 1} (the year after the headline window)"
+    if nxt.get("all_core_due") is not False:
+        return False, f"SKIP projection check: FYE {h['fye_max'] + 1} has all_core_due={nxt.get('all_core_due')!r}, so no projection is due"
+    if not core_gap_lines(cov):
+        return False, "SKIP projection check: no gap year in the headline window, so no context lines are due"
+    return True, "projection line expected"
+
+
+def check_gap_lines(page, vname, app, problems, cov, checks=None):
     """CHG-2026-034 (option A): the note under the headline (home), on the coverage page and on the report card equals core_gap_lines(coverage.json);
     the headline itself is still there and unchanged; the report card and glossary no longer say 'not published'."""
     base = app.split("#")[0]
     want = core_gap_lines(cov)
     want_ctx = headline_context_lines(cov)
     h = cov["headline"]
+    expected, why = projection_status(cov)
+    if checks is not None:
+        checks[f"{vname}_projection"] = why          # a skip is never silent: the reason is in the output
+    if expected and not any(x.startswith("Projection, not data: ") for x in want_ctx):
+        problems.append(f"{vname} gap-lines: {why}, but headline_context_lines() gives none")
 
     def say(where, msg):
         problems.append(f"{vname} gap-lines/{where}: {msg}")
@@ -379,8 +397,20 @@ def check_gap_lines(page, vname, app, problems, cov):
             if re.search(r"publish", whole, re.I):
                 say(where, f"the word 'publish' appears in the gap note: {whole!r}")
             ctx = [re.sub(r"\s+", " ", t).strip() for t in box.locator('p[data-note="context"]').all_inner_texts()]
-            if ctx != (want_ctx if where == "home" else []):
-                say(where, f"headline context lines read {ctx!r}, expected {(want_ctx if where == 'home' else [])!r}")
+            # CHG-2026-046: home shows every context line; the coverage page and the report card show the projection line only
+            want_proj = [x for x in want_ctx if x.startswith("Projection, not data: ")]
+            exp_ctx = want_ctx if where == "home" else want_proj
+            if ctx != exp_ctx:
+                say(where, f"headline context lines read {ctx!r}, expected {exp_ctx!r}")
+            # every place that shows the projection line shows it with its label and the projection mark
+            proj = [re.sub(r"\s+", " ", t).strip() for t in box.locator('p[data-kind="projection"]').all_inner_texts()]
+            if expected and not proj:
+                say(where, "projection line expected but not shown")
+            if proj != want_proj:
+                say(where, f"projection lines read {proj!r}, expected {want_proj!r}")
+            for t in ctx:
+                if ("would fall to about" in t) and not t.startswith("Projection, not data: "):
+                    say(where, f"a projection line is shown without its label: {t!r}")
             if where == "home":
                 kpi = page.locator(".kpi").first
                 kt = re.sub(r"\s+", " ", kpi.inner_text())
@@ -492,6 +522,7 @@ def main() -> int:
     dep = json.loads((ROOT / "public-data" / "v1" / "departments.json").read_text())["departments"][0]["id"]
     cov = json.loads((ROOT / "public-data" / "v1" / "coverage.json").read_text())
     mun = json.loads((ROOT / "public-data" / "v1" / "municipalities.json").read_text())
+    from playwright.sync_api import sync_playwright   # imported here so tests can load this module without the screenshots group
     problems, shots, checks = [], [], {}
     with sync_playwright() as p:
         chrome = shutil.which("google-chrome") or shutil.which("chromium")   # box Chrome; else Playwright's own
@@ -521,7 +552,7 @@ def main() -> int:
                 page.screenshot(path=str(f), full_page=vname == "desktop" and name in ("home", "flags", "tools", "unknowns", "changes"))
                 shots.append(str(f))
             check_by_type(page, vname, app, problems, cov, mun)      # CHG-2026-033: "By data type" table, banner, notes, order, text
-            check_gap_lines(page, vname, app, problems, cov)        # CHG-2026-034: note under the headline, coverage page, report card; wording
+            check_gap_lines(page, vname, app, problems, cov, checks)        # CHG-2026-034: note under the headline, coverage page, report card; wording
             # tools: inflation + fuel checker produce results; CSV download works
             page.goto(app.split("#")[0] + "#/tools")
             page.wait_for_selector('#view[aria-busy="false"]')
