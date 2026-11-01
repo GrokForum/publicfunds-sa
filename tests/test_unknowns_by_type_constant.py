@@ -169,8 +169,8 @@ def test_page_code_matches_reference(name, mutate):
 def test_reference_behaviour_on_mutations():
     base = model(COV, MUN)
     assert base["uifw"]["empty"] == ["2024/25"] and base["uifw"]["ceiling"]["EC"] == 83.3
-    assert base["uifw"]["note"].startswith("At most 83,3% with the data PublicFunds loads today (")   # decimal comma, as the page shows
-    assert base["_text"]["in_cell"]["EC"]["uifw"] == "(at most 83,3% with the data loaded today)"
+    assert base["uifw"]["note"].startswith("At most 83.3% with the data PublicFunds loads today (")   # point decimal, as the page shows (CHG-2026-047)
+    assert base["_text"]["in_cell"]["EC"]["uifw"] == "(at most 83.3% with the data loaded today)"
     assert base["procurement"] == {"empty": [], "ceiling": {}, "note": None} and not any(base["_text"]["in_cell"][p]["procurement"] for p in base["_text"]["in_cell"])
     assert not any("tender" in line for line in base["_banner"])       # decision 3: no tender note, marker, banner line or ceiling
     v = model(mutate_reviewer_a_case(COV), MUN)
@@ -275,7 +275,7 @@ def test_public_text_has_no_internal_jargon_or_published(mutate):
 def test_the_jargon_check_itself_catches_the_words():
     for bad in ("see KE-006", "not published", "Treasury says", "the uifwexp cube", "eTenders", "Published by AGSA", "components_missing"):
         assert jargon(bad), bad
-    assert not jargon("At most 83,3% with the data PublicFunds loads today (take-up of data)")
+    assert not jargon("At most 83.3% with the data PublicFunds loads today (take-up of data)")
     assert set(HEADERS) == set(COV["data_types"])
 
 
@@ -358,9 +358,9 @@ def test_gap_lines_have_no_jargon_or_published(name, mutate):
 
 
 # ------------------------------------------------------------------ 6. CHG-2026-034 review fixes: context beside the headline, labels, wording
-REAL_CONTEXT = ["Includes 2024/25, for which no municipality has complete data in what PublicFunds has loaded. 2019/20 to 2023/24 alone: 90,8% (1167 of 1285 municipality-years).",
+REAL_CONTEXT = ["Includes 2024/25, for which no municipality has complete data in what PublicFunds has loaded. 2019/20 to 2023/24 alone: 90.8% (1,167 of 1,285 municipality-years).",
                 "Projection, not data: from the first data update on or after 1 December 2026, the year 2025/26 counts in the headline. If it then looks "
-                "like 2024/25 does today (no municipality with complete data), the headline would fall to about 64,9% (1167 of 1799 municipality-years), because 2025/26 would count as a gap, not because anything got worse, if nothing else changes."]
+                "like 2024/25 does today (no municipality with complete data), the headline would fall to about 64.9% (1,167 of 1,799 municipality-years), because 2025/26 would count as a gap, not because anything got worse, if nothing else changes."]
 
 
 @needs_baseline
@@ -386,7 +386,7 @@ def test_headline_context_edge_cases():
     assert headline_context_lines(d) == REAL_CONTEXT[:1]                                 # no next year in the data: no prediction
     v = headline_context_lines(mutate_reviewer_a_case(c))                                 # 2022/23 and 2024/25 empty: not one block
     assert v[0].startswith("Includes 2022/23 and 2024/25, ") and "2019/20, 2020/21, 2021/22 and 2023/24 alone: " in v[0]
-    assert "(" + str(232 + 228 + 240 + 235) + " of " + str(257 * 4) + " municipality-years)" in v[0] and "about" in v[1] and "like 2024/25 does today" in v[1]
+    assert "(" + f"{232 + 228 + 240 + 235:,}" + " of " + f"{257 * 4:,}" + " municipality-years)" in v[0] and "about" in v[1] and "like 2024/25 does today" in v[1]
     w = headline_context_lines(mutate_window_start_emptied(c))                           # window start empty: the rest is 2020/21 to 2023/24
     assert w[0].startswith("Includes 2019/20 and 2024/25, ") and "2020/21 to 2023/24 alone: " in w[0]
     assert headline_context_lines(copy.deepcopy(c) | {"data_types": []}) == []
@@ -432,7 +432,7 @@ def test_reason_label_for_tender_cells_is_plain_and_the_old_one_is_gone():
 
 def test_home_tender_kpi_and_unknowns_lead_in_the_page_source():
     page = PAGE_JS.read_text()
-    assert 'kp(ctr.awards.toLocaleString("en-ZA"), "tender award records")' in page and "published tender award records" not in page
+    assert 'kp(ctr.awards.toLocaleString(NUM_LOCALE), "tender award records")' in page and "published tender award records" not in page
     lead = re.search(r'class: "lead"\}, `(For each province[^`]*)`', page).group(1)
     assert lead.startswith("For each province, how much of the expected data PublicFunds has for its municipalities, over the financial years ")
     assert lead.endswith("(the years whose audits are due). Lowest first, so the biggest blind spots are at the top.")
@@ -475,10 +475,10 @@ def test_a_year_before_the_window_changes_nothing():
 
 
 def test_headline_context_says_municipality_years_with_decimal_commas_and_why_the_prediction_falls():
-    """Each count carries its unit (not 'municipalities'), percentages use the decimal comma the by-type table uses, and the prediction says the fall
+    """Each count carries its unit (not 'municipalities'), percentages use a point decimal and counts a comma thousands separator (CHG-2026-047), and the prediction says the fall
     comes from the year counting as a gap, not from anything getting worse, and that it assumes nothing else changes."""
     first, second = headline_context_lines(COV)
-    assert "90,8%" in first and "(1167 of 1285 municipality-years)" in first and "90.8" not in first
-    assert "64,9%" in second and "(1167 of 1799 municipality-years)" in second and "64.9" not in second
+    assert "90.8%" in first and "(1,167 of 1,285 municipality-years)" in first and "90,8" not in first
+    assert "64.9%" in second and "(1,167 of 1,799 municipality-years)" in second and "64,9" not in second
     assert second.endswith("because 2025/26 would count as a gap, not because anything got worse, if nothing else changes.")
     assert second.startswith("Projection, not data: ")

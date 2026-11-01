@@ -414,7 +414,7 @@ def check_gap_lines(page, vname, app, problems, cov, checks=None):
             if where == "home":
                 kpi = page.locator(".kpi").first
                 kt = re.sub(r"\s+", " ", kpi.inner_text())
-                for need in (f"{h['complete_pct']}%", f"{h['complete']} of {h['applicable']} municipality-years"):
+                for need in (f"{h['complete_pct']}%", f"{h['complete']:,} of {h['applicable']:,} municipality-years"):
                     if need not in kt:
                         say(where, f"the headline card no longer shows {need!r}: {kt!r}")
                 kb, bb = kpi.bounding_box(), box.bounding_box()
@@ -494,6 +494,37 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+# CHG-2026-047 (owner decision): on every public page a number has a comma thousands separator and a point decimal (1,000,000.00; 75.7%).
+COMMA_DECIMAL = re.compile(r"(?<![\d,.])\d+,\d{1,2}(?![\d,])")          # 90,8 or 1 000,00: a decimal comma
+SPACE_THOUSANDS = re.compile(r"(?<![\d.,])\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?![\d])")   # 1 000 000: space thousands
+
+
+def verbatim_texts() -> list[str]:
+    """Text the page quotes word for word from the data (known gaps, known errors, source names). The scan skips it: it is not our number format."""
+    man = json.loads((ROOT / "public-data" / "v1" / "manifest.json").read_text())
+    out = []
+    def walk(x):
+        if isinstance(x, str):
+            out.append(re.sub(r"\s+", " ", x).strip())
+        elif isinstance(x, dict):
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    for k in ("known_gaps", "known_errors", "sources"):
+        walk(man.get(k) or [])
+    return sorted({t for t in out if t}, key=len, reverse=True)
+
+
+def number_format_problems(text: str, verbatim: list[str]) -> list[str]:
+    """Numbers in page text that do not use comma thousands and a point decimal."""
+    t = re.sub(r"[\t\r\n]+", " | ", text)     # table cells and lines stay apart; only a real space joins digits
+    for v in verbatim:
+        t = t.replace(v, " | ")
+    return [f"decimal comma {m!r}" for m in COMMA_DECIMAL.findall(t)] + [f"space thousands {m!r}" for m in SPACE_THOUSANDS.findall(t)]
+
+
 def fuel_known_ids() -> set[str]:
     """Known-error ids the fuel card must show: ids named in prices.fuel.about, plus those named in the known gap of such an id."""
     pub = ROOT / "public-data" / "v1"
@@ -524,6 +555,7 @@ def main() -> int:
     mun = json.loads((ROOT / "public-data" / "v1" / "municipalities.json").read_text())
     from playwright.sync_api import sync_playwright   # imported here so tests can load this module without the screenshots group
     problems, shots, checks = [], [], {}
+    VERBATIM = verbatim_texts()
     with sync_playwright() as p:
         chrome = shutil.which("google-chrome") or shutil.which("chromium")   # box Chrome; else Playwright's own
         browser = p.chromium.launch(executable_path=chrome, headless=True) if chrome else p.chromium.launch()
@@ -548,6 +580,8 @@ def main() -> int:
                     checks.setdefault("axe", {})[f"{vname}:{name}"] = res
                     problems += [f"{vname} {name} axe {v['impact']}: {v['id']} ({v['n']} nodes)" for v in res
                                  if v["impact"] in ("serious", "critical")]
+                for bad in number_format_problems(page.locator("#view").inner_text(), VERBATIM):
+                    problems.append(f"{vname} {name} number format: {bad}")
                 f = out / f"{name}-{vname}.png"
                 page.screenshot(path=str(f), full_page=vname == "desktop" and name in ("home", "flags", "tools", "unknowns", "changes"))
                 shots.append(str(f))
