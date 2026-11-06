@@ -19,3 +19,6 @@
 - 2026-10-23 17:52 SAST: CHG-2026-021 (fuel Coast 95 LRP label) merged as PR #19 (merge d54e362, owner GO [owner GO; exact words in the private approval record] at 17:51 SAST); the corrected label publishes at the next nightly refresh. Gate locked.
 - 2026-10-23 19:06 SAST: CHG-2026-022 (fuel Sept 2022 split row) merged as PR #20 (merge 65bc8dd, owner GO [owner GO; exact words in the private approval record] at 19:03 SAST); 2022-09 publishes at the next nightly refresh. Gate locked.
 - 2026-10-23 19:06 SAST: CHG-2026-023 (fuel Inland 95 ULP label) merged as PR #21 (merge 74456bc, owner GO [owner GO; exact words in the private approval record] at 19:03 SAST); the corrected label publishes at the next nightly refresh. Gate locked.
+
+## Queued (2026-11-06)
+- Offsite MariaDB backup on domains.co.za and a local `/wd` copy remain queued (CSI-055, CI-050). The review database needs a POPIA review and encryption before any offsite copy. **Do not build MariaDB yet.** Local state backup on the box continues under CSI-009 / CHG-2026-044.
