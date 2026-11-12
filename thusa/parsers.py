@@ -266,9 +266,20 @@ def fuel_history_rows(blob: bytes, name: str = "") -> list[dict]:
                     if not cell.strip():
                         continue
                     out.append({"year": year, "month": mon, "grade": grade, "grade_label": label,
-                                "cents_per_litre": float(cell.replace(",", "")),
+                                "cents_per_litre": _fuel_history_number(cell),
                                 "source_locator": f"{docname}#table-row{i}"})
     return out
+
+
+def _fuel_history_number(cell: str) -> float:
+    """Read a DMPR history-table cell as cents per litre.
+
+    A comma is stripped, as before. A space, a no-break space (U+00A0) or a
+    narrow no-break space (U+202F) is also stripped, so a thousands group such
+    as '3 085.67' is accepted (CHG-2026-056). The comma-versus-point decimal
+    rule is not changed.
+    """
+    return float(cell.replace(",", "").replace(" ", "").replace("\u00a0", "").replace("\u202f", ""))
 
 
 _PDF_MONTH = re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|July?|Aug|Sept?|Oct|Nov|Dec)$")
