@@ -113,3 +113,32 @@ def test_page_csv_export_does_not_use_screen_format():
 
 def test_file_sizes_use_comma_thousands():
     assert "toFixed(0)} KB" not in PAGE and "${intg(x.bytes / 1024)} KB" in PAGE
+
+
+# ---- CHG-2026-057 follow-up: no raw percent concat; count cells go through formatCount ----
+
+def test_dashboard_has_no_raw_percent_concatenation():
+    """Percent display outside the format and ceiling blocks must use pctPoints or formatPct, not a raw value + percent sign."""
+    start, end = PAGE.index("/* format:begin */"), PAGE.index("/* format:end */")
+    rest = PAGE[:start] + PAGE[end + len("/* format:end */"):]
+    c0, c1 = rest.index("/* ceiling:begin */"), rest.index("/* ceiling:end */")
+    rest = rest[:c0] + rest[c1 + len("/* ceiling:end */"):]
+    raw = re.findall(r".{0,50}\+\s*\"%\"", rest)
+    assert not raw, raw
+
+
+def test_dashboard_has_no_stale_pct_precision_argument():
+    """page-level pct() has a fixed two-decimal precision; a literal second argument is stale."""
+    assert not re.search(r"\bpct\([^)\n]+,\s*\d+\s*\)", PAGE)
+
+
+def test_table_formats_numeric_count_cells():
+    """num: 1 columns with a bare numeric value() are shown with formatCount; CSV still uses the raw value()."""
+    assert "function tableCell(c, r)" in PAGE
+    assert "formatCount(v)" in PAGE[PAGE.index("function tableCell"): PAGE.index("function table(")]
+    assert "c.csvValue ? c.csvValue(r) : (c.value ? c.value(r)" in PAGE   # CSV path unchanged
+
+
+def test_present_pct_uses_shared_formatter():
+    assert "pctPoints(r[1].present_pct)" in PAGE
+    assert 'present_pct + "%"' not in PAGE

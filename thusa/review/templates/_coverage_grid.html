@@ -1,5 +1,5 @@
-<p class="counts">{{ ents|length }} municipalities · present <b>{{ summary.present }}</b> · partial <b>{{ summary.partial }}</b> · missing <b>{{ summary.missing }}</b> · n.a. {{ summary['n.a.'] }}
-{% if summary.present_pct is not none %}· <b>{{ summary.present_pct }}%</b> present of applicable cells{% endif %}</p>
+<p class="counts">{{ ents|length|count }} municipalities · present <b>{{ summary.present|count }}</b> · partial <b>{{ summary.partial|count }}</b> · missing <b>{{ summary.missing|count }}</b> · n.a. {{ summary['n.a.']|count }}
+{% if summary.present_pct is not none %}· <b>{{ summary.present_pct|amount }}%</b> present of applicable cells{% endif %}</p>
 <p class="muted">This grid includes years in which not every data type is due yet (e.g. audit results for the latest year); the published headline counts only years where all core data is due.</p>
 <div class="table-wrap"><table class="heat">
 <thead><tr><th class="ent">Municipality</th><th>Prov.</th>{% for y in years %}<th>{{ y.fy_label }}</th>{% endfor %}</tr></thead>

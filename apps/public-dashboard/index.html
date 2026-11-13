@@ -186,18 +186,24 @@ function _roundHalfUp(value, places) {
 }
 function formatAmount(value) {
   const p = _roundHalfUpParts(value, 2);
-  return p == null ? "" : (p.sign < 0 ? "-" : "") + _group(p.intp) + "." + p.frac;
+  if (p == null) return "";
+  if (p.intp === "0" && /^0+$/.test(p.frac)) return "0.00";  // not -0.00
+  return (p.sign < 0 ? "-" : "") + _group(p.intp) + "." + p.frac;
 }
 function formatCount(value) {
   const p = _roundHalfUpParts(value, 0);
-  return p == null ? "" : (p.sign < 0 ? "-" : "") + _group(p.intp);
+  if (p == null) return "";
+  if (p.intp === "0") return "0";
+  return (p.sign < 0 ? "-" : "") + _group(p.intp);
 }
 function formatRand(cents) {
   if (cents == null || cents === "") return "unknown";
   const n = Number(cents);
   if (!Number.isFinite(n)) return "unknown";
   const body = formatAmount(Math.abs(n) / 100);
-  return body ? (n < 0 ? "-R" : "R") + body : "unknown";
+  if (!body) return "unknown";
+  if (body === "0.00") return "R0.00";
+  return (n < 0 ? "-R" : "R") + body;
 }
 function formatPct(fraction) {
   if (fraction == null || fraction === "") return null;
@@ -210,6 +216,12 @@ function formatPctParts(c, a) {
   c = Number(c); a = Number(a);
   if (!Number.isFinite(c) || !Number.isFinite(a) || a === 0) return "";
   return formatAmount(Math.floor((20000 * c + a) / (2 * a)) / 100);
+}
+function pctPoints(value) {
+  /* A value already in percentage points (75.7) as 75.70%. For a fraction, use formatPct. */
+  if (value == null || value === "") return null;
+  const body = formatAmount(value);
+  return body ? body + "%" : null;
 }
 /* format:end */
 function intg(v) { return v == null ? "" : formatCount(v); }
@@ -235,11 +247,19 @@ function downloadCSV(name, columns, rows) {
   const blob = new Blob(["\ufeff" + lines.join("\r\n") + "\r\n"], {type: "text/csv;charset=utf-8"});
   const a = el("a", {href: URL.createObjectURL(blob), download: name}); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+function tableCell(c, r) {
+  /* Display only. CSV still uses c.csvValue or the raw c.value, so counts stay plain in downloads. */
+  if (c.render) return c.render(r) ?? unknown();
+  const v = c.value ? c.value(r) : r[c.key];
+  if (v == null || v === "") return unknown();
+  if (c.num && typeof v === "number" && Number.isFinite(v)) return formatCount(v);
+  return v;
+}
 function table(caption, allColumns, rows, csvName, opts = {}) {
   const limit = opts.limit || 500, shown = rows.slice(0, limit), columns = allColumns.filter(c => !c.csvOnly);
   const t = el("table", {}, opts.captionAbove ? null : el("caption", {class: "small muted", style: "text-align:left;padding:.4rem .6rem"}, caption),
     el("thead", {}, el("tr", {}, columns.map(c => el("th", {scope: "col", class: [c.num ? "num" : "", c.wrap ? "wrap-h" : ""].join(" ").trim() || null, "data-dt": c.dt}, c.label, (c.marks || []).map(m => el("span", {class: "ymark"}, m)))))),
-    el("tbody", {}, shown.map(r => el("tr", opts.rowAttrs ? opts.rowAttrs(r) : {}, columns.map(c => el("td", {class: c.num ? "num" : null, "data-dt": c.dt}, c.render ? c.render(r) : (c.value ? c.value(r) : r[c.key]) ?? unknown()))))));
+    el("tbody", {}, shown.map(r => el("tr", opts.rowAttrs ? opts.rowAttrs(r) : {}, columns.map(c => el("td", {class: c.num ? "num" : null, "data-dt": c.dt}, tableCell(c, r)))))));
   const tools = el("div", {class: "tools"},
     csvName ? el("button", {class: "btn-csv", onclick: () => downloadCSV(csvName, allColumns, rows)}, `Download CSV (${intg(rows.length)} rows)`) : null,
     rows.length > limit ? el("span", {class: "small muted"}, `Showing ${intg(limit)} of ${intg(rows.length)}; the CSV has all rows.`) : null);
@@ -307,7 +327,7 @@ async function vHome() {
   setView("Where does South Africa's public money go?",
     el("p", {class: "lead"}, "Budgets, spending, audit results and tenders for every municipality and national department - from official open data, with what is missing shown as clearly as what is there."),
     el("div", {class: "grid"},
-      kp(c.complete_pct == null ? "unknown" : formatAmount(c.complete_pct) + "%", `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
+      kp(c.complete_pct == null ? "unknown" : pctPoints(c.complete_pct), `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
       gap,
       kp(intg(ctr.municipalities), "municipalities and districts"),
       kp(intg(ctr.departments), "national departments with budget data"),
@@ -355,14 +375,14 @@ async function vCoverage(params) {
   const summary = table("Share of applicable municipality-years with each data type present (years whose audits are due)", [
     {label: "Data type", value: r => DT[r[0]] || r[0]},
     {label: "Present", num: 1, value: r => r[1].present}, {label: "Partial", num: 1, value: r => r[1].partial}, {label: "Missing", num: 1, value: r => r[1].missing},
-    {label: "Present %", num: 1, value: r => r[1].present_pct == null ? null : r[1].present_pct + "%"}], Object.entries(h), "coverage-by-type.csv");
+    {label: "Present %", num: 1, render: r => r[1].present_pct == null ? null : pctPoints(r[1].present_pct), value: r => r[1].present_pct}], Object.entries(h), "coverage-by-type.csv");
   function draw() {
     const i = cov.data_types.indexOf(st.dt), q = st.q.toLowerCase();
     const ents = cov.entities.map(e => ({e, m: byId[e.id]})).filter(({m}) => m && (!st.p || m.province === st.p) && (!st.t || m.type === st.t) && (!q || (m.name + " " + m.code).toLowerCase().includes(q)))
       .sort((a, b) => a.m.province.localeCompare(b.m.province) || a.m.name.localeCompare(b.m.name));
     const cell = (e, k) => { const s = e.c[st.dt][k], r = +e.r[st.dt][k], why = r ? REASON[cov.reasons[r - 1]] || cov.reasons[r - 1] : "";
       return el("td", {class: "c s-" + s, title: `${STATE[s]}${why ? ": " + why : ""}`, "aria-label": `${cov.fy_labels[k]}: ${STATE[s]}${why ? ", " + why : ""}`}, SYM[s]); };
-    const t = el("table", {class: "heat"}, el("caption", {class: "small muted", style: "text-align:left"}, `${DT[st.dt]}: ${ents.length} municipalities. Hover or focus a cell for the reason.`),
+    const t = el("table", {class: "heat"}, el("caption", {class: "small muted", style: "text-align:left"}, `${DT[st.dt]}: ${intg(ents.length)} municipalities. Hover or focus a cell for the reason.`),
       el("thead", {}, el("tr", {}, el("th", {scope: "col"}, "Municipality"), cov.fy_labels.map(y => el("th", {scope: "col"}, el("abbr", {title: y}, y.slice(2)))))),
       el("tbody", {}, ents.map(({e, m}) => el("tr", {}, el("th", {scope: "row", style: "font-weight:500"}, el("a", {href: "#/m/" + encodeURIComponent(m.id)}, m.name), " ", el("span", {class: "muted"}, m.province)),
         cov.years.map((_, k) => cell(e, k))))));
@@ -374,7 +394,7 @@ async function vCoverage(params) {
   setView("Data coverage", el("p", {class: "lead"}, "Which official data exists for each municipality and financial year (July–June). Missing data is a finding in itself: it is shown, never hidden or filled in."),
     el("div", {class: "legend"}, Object.entries(STATE).filter(([k]) => k !== "?").map(([k, v]) => el("span", {}, el("i", {class: "s-" + k}), `${SYM[k]} ${v}`))),
     filters, body, el("h2", {}, "Summary"), summary,
-    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct == null ? "unknown" : formatAmount(cov.headline.complete_pct) + "%"} of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
+    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct == null ? "unknown" : pctPoints(cov.headline.complete_pct)} of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
     gapBox(coreGapLines(cov), {link: 1, extra: projectionLines(cov)}));
   draw();
 }
@@ -465,7 +485,7 @@ async function vMunicipality(id) {
     buyers.length ? [
       table("Published tender awards by year (eTenders)", [
         {label: "Year", value: r => r[0]}, {label: "Awards", num: 1, value: r => r[1].awards}, {label: "Known value", num: 1, render: r => rand(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
-        {label: "No value published", num: 1, value: r => pct(r[1].missing_share, 0)}, {label: "Largest supplier's share", num: 1, value: r => pct(r[1].top_supplier_share, 0)}],
+        {label: "No value published", num: 1, value: r => pct(r[1].missing_share)}, {label: "Largest supplier's share", num: 1, value: r => pct(r[1].top_supplier_share)}],
         buyers.flatMap(b => Object.entries(b.years).filter(([k]) => k !== "all")), `${m.code}-tenders.csv`),
       el("p", {class: "small muted"}, "Supplier concentration is shown without names. Values: only plausible published values are summed; awards without a value are counted, never treated as R0."),
       el("button", {onclick: async e => { e.target.disabled = true; e.target.textContent = "Loading award records…"; await showAwards(awardsBox, new Set(buyers.map(b => b.id)), m.code); e.target.remove(); }}, "Show award records (downloads about 2 MB)"), awardsBox]
@@ -530,14 +550,14 @@ async function vTenders(params) {
     out.replaceChildren(table("Buyers (all years)", [
       {label: "Buyer", render: b => b.gov_body_id ? el("a", {href: "#/m/" + encodeURIComponent(b.gov_body_id)}, b.name) : b.name, value: b => b.name},
       {label: "Awards", num: 1, value: b => b.years.all.awards}, {label: "Known value", num: 1, render: b => rand(b.years.all.known_value), csvValue: b => b.years.all.known_value == null ? null : b.years.all.known_value / 100, csv: "known_value_rand"},
-      {label: "No value published", num: 1, value: b => pct(b.years.all.missing_share, 0)}, {label: "Largest supplier's share", num: 1, value: b => pct(b.years.all.top_supplier_share, 0)},
+      {label: "No value published", num: 1, value: b => pct(b.years.all.missing_share)}, {label: "Largest supplier's share", num: 1, value: b => pct(b.years.all.top_supplier_share)},
       {label: "Records", render: b => el("button", {class: "btn-csv", onclick: async e => { e.target.disabled = true; await showAwards(awardsBox, new Set([b.id]), (b.name || "buyer").replace(/[^a-z0-9]+/gi, "-")); awardsBox.scrollIntoView({behavior: "smooth"}); e.target.disabled = false; }}, "show"), value: () => ""}],
       rows, "tender-buyers.csv", {limit: 150}));
   }
   setView("Tenders", el("p", {class: "lead"}, "Tender awards published by government buyers on National Treasury's eTenders portal. These are public records as published - not flags or findings. Award values can be multi-year, framework or estimated contract values, so a year's total is not that year's spending."),
     table("All buyers, by year", [{label: "Year", value: r => r[0]}, {label: "Awards", num: 1, value: r => r[1].awards},
       {label: "Known value", num: 1, render: r => rand(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
-      {label: "No value published", num: 1, value: r => pct(r[1].missing_share, 0)}, {label: "Implausible values", num: 1, value: r => r[1].implausible_value}], nat, "tenders-by-year.csv"),
+      {label: "No value published", num: 1, value: r => pct(r[1].missing_share)}, {label: "Implausible values", num: 1, value: r => r[1].implausible_value}], nat, "tenders-by-year.csv"),
     el("p", {class: "small muted"}, ts.about.join(" ")),
     el("h2", {}, "Buyers"),
     el("div", {class: "tools", role: "search"}, el("label", {}, "Search buyers", el("input", {type: "search", value: st.q, oninput: e => { st.q = e.target.value; draw(); }})),
@@ -551,7 +571,7 @@ async function vFlags() {
   const hid = Object.entries(f.hidden_leads.by_detector);
   setView("Flags", el("div", {class: "card"}, el("p", {}, el("b", {}, "What a flag is. "), f.disclaimer, " ", el("a", {href: "#/glossary"}, "What each check means"), "."),
       el("p", {class: "small muted"}, "Rules: ", f.policy.published, "; ", f.policy.four_eyes, ". Unconfirmed leads are ", f.policy.unconfirmed, ".")),
-    el("h2", {}, `Confirmed flags (${f.confirmed.length})`),
+    el("h2", {}, `Confirmed flags (${intg(f.confirmed.length)})`),
     f.confirmed.length ? f.confirmed.map(x => el("div", {class: "card", style: "margin:.6rem 0"}, el("div", {class: "small muted"}, "Confirmed by review · ", x.detector_id.split("_")[0], " · ", x.severity, " · ", x.period_label || ""),
       el("h3", {}, x.title), el("p", {}, x.explanation), x.review_reason ? el("p", {class: "small"}, "Reviewers' reason: ", x.review_reason) : null,
       el("p", {class: "small"}, "Confirmed ", dateSast(x.confirmed_at_sast), " · evidence: ", x.evidence_urls.map((u, i) => [link(u, `source ${i + 1}`), " "]))))
@@ -826,7 +846,7 @@ async function vUnknowns() {
     const m = byId[e.id];
     return {id: e.id, name: m.name, code: m.code, province: m.province, ...c, known: pct(c.P, c.n)};
   }).filter(r => r.n).sort((a, b) => a.known - b.known || b.m - a.m || a.name.localeCompare(b.name));
-  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), num(v) + "%");
+  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), pctPoints(v));
   /* CHG-2026-033: what each by-type column measures, n of N in the cell, the years no municipality has complete data for (descriptive, no cause) */
   const R = ceilingModel(cov, mun), DT_AVAIL = R._text.headers;
   const toTrend = e => { e.preventDefault(); const t = $("#trend"), h = $("header");   // the header is sticky and 73-135 px high: land the heading below it
@@ -853,7 +873,7 @@ async function vUnknowns() {
       {label: "Fully available", num: 1, render: r => meter(r.known), value: r => r.known},
       {label: "Partly available", num: 1, value: r => r.tot.p},
       {label: "Missing", num: 1, value: r => r.tot.m},
-      {label: "Most common reason for a gap", render: r => r.top ? `${REASON[r.top[0]] || r.top[0]} (${r.top[1]})` : unknown("none"), value: r => r.top ? r.top[0] : ""}],
+      {label: "Most common reason for a gap", render: r => r.top ? `${REASON[r.top[0]] || r.top[0]} (${intg(r.top[1])})` : unknown("none"), value: r => r.top ? r.top[0] : ""}],
       rows, "known-unknowns-by-province.csv")),
     el("div", {id: "by-type"},
       el("h2", {}, "By data type"),
@@ -1005,7 +1025,7 @@ async function vCard(id) {
           ". Irregular means a rule was not followed, not that money was stolen."] : null),
       row("data items available (known unknowns)", covE ? `${intg(comp.n.P)} of ${intg(comp.total)}` : unknown(),
         covE ? [`${intg(comp.n.p)} partial, ${intg(comp.n.m)} missing, financial years ${cov.fy_labels[0]} to ${cov.fy_labels[cov.fy_labels.length - 1]}. `, el("a", {href: "#/unknowns"}, "Known unknowns")] : null),
-      row(["confirmed, published ", g("flags")], String(flags.length),
+      row(["confirmed, published ", g("flags")], intg(flags.length),
         "Only flags people reviewed and confirmed. Automated leads that are not confirmed are never shown or counted here. A confirmed flag is not a finding of wrongdoing.")),
     el("p", {class: "small"}, el("b", {}, "A blank means unknown, never zero. "), "If a figure says unknown or not available, it is not in the data PublicFunds loads today. It is not evidence of a good or bad result."),
     gapBox(coreGapLines(cov), {card: 1, extra: projectionLines(cov)}),
@@ -1014,7 +1034,7 @@ async function vCard(id) {
   setView(`${m.name}: report card`,
     el("p", {class: "lead"}, `${TYPES[m.type] || m.type} · ${prov(m.province)} · code ${m.code}. `, el("a", {href: "#/m/" + encodeURIComponent(m.id)}, "Full municipality page →")),
     card, el("div", {class: "tools"}, copy),
-    comp.gaps.length ? el("details", {}, el("summary", {}, `Which data is missing or partial (${comp.gaps.length})`),
+    comp.gaps.length ? el("details", {}, el("summary", {}, `Which data is missing or partial (${intg(comp.gaps.length)})`),
       el("ul", {class: "gap"}, comp.gaps.map(([t, k, s]) => { const r = +covE.r[t][k]; return el("li", {}, `${DT[t]}, ${cov.fy_labels[k]}: ${STATE[s]}`, r ? ` (${REASON[cov.reasons[r - 1]] || cov.reasons[r - 1]})` : ""); }))) : null);
 }
 

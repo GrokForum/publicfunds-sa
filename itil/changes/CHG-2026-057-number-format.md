@@ -6,7 +6,7 @@
 | Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
 | Type | **Normal-medium**. See "Why this type". |
 | Environment | DEV only (branch `feat/chg-2026-057-number-format` from origin/main). Nothing pushed to main. Public data is not changed in this PR. No publish script was run. |
-| CIs affected | New `thusa/format.py`; `apps/public-dashboard/index.html`; `thusa/coverage_ceiling.py`; `thusa/review/casepack.py`; `thusa/review/warehouse.py`; `thusa/report.py`; `thusa/publish.py`; `scripts/dashboard_check.py` (comment only); tests listed below; this record; `itil/registers/change-log.md` |
+| CIs affected | New `thusa/format.py`; `apps/public-dashboard/index.html`; `thusa/coverage_ceiling.py`; `thusa/review/casepack.py`; `thusa/review/warehouse.py`; `thusa/review/app.py`; review-app templates; `thusa/report.py`; `thusa/publish.py`; `scripts/dashboard_check.py` (comment only); tests listed below; this record; `itil/registers/change-log.md` |
 | Linked records | CHG-2026-047 (public-page comma thousands and point decimal; this change extends that rule and tightens amount decimals), old-repo work that was waiting on the comma-versus-point decimal question |
 | Rollback | Close the PR unmerged. If ever merged: `git revert -m 1 <merge commit>`. Git history is the rollback; no .bkp files. |
 
@@ -50,6 +50,16 @@ These related choices in this PR were not explicitly settled and remain open for
 4. Case-pack bidding limits and the HHI threshold use comma thousands and, for rand amounts, two decimals.
 5. Tests: new `tests/test_format.py` (negatives, zero, large values, ROUND_HALF_UP versus banker's rounding, None/NaN/infinities, Python/JS parity, and a proof that public-data JSON/CSV stay plain and that `thusa/publish_data.py` does not import the display helpers). Existing number-format, glossary, case-pack and by-type tests were updated for the two-decimal display.
 
+### Review follow-up (this head)
+
+The first reviewer passed the code and asked for a fresh head that covers every displayed number.
+
+1. Coverage-by-type "Present %" uses `pctPoints` (81.9 shows as 81.90%). The CSV still has the plain stored value.
+2. The table helper now shows a `num` column with a bare numeric `value` through `formatCount` (for example Awards, Present/Partial/Missing, hidden leads). The CSV path is unchanged. Other leftover counts (confirmed-flags heading, coverage row count, report-card flag and gap counts, "most common gap reason" count) use `intg`. Review-app templates format non-cents count columns and status/coverage counts through the `count` and `amount` filters. Years, dates, IDs, SHAs and versions stay unformatted.
+3. Stale second arguments such as `pct(share, 0)` are removed.
+4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). Related choices stay open.
+5. Optional: `format_amount(-0.0)` and any value that rounds to zero show `0.00`, never `-0.00`, with a test. The CHG-2026-056 change-log row, which still said the PR was not merged, now records the merge of PR #5 at 13 Nov 2026 19:16 SAST (merge 8cdf9ad6). That side fix is documentation only.
+
 ## Stays the same
 
 - Raw data files: CSV, JSON, the database, `public-data/v1` exports and the manifest keep plain point decimals with no thousands separator. `thusa/publish_data.py` is not edited.
@@ -61,7 +71,7 @@ These related choices in this PR were not explicitly settled and remain open for
 ## Seen, not touched
 
 - `thusa/detectors.py` still formats amounts in stored flag titles and explanations with one helper of its own (`R{cents/100:,.0f}`). Those strings are warehouse (and later export) content. A later change can show them in the standard display form without rewriting stored data, or can change the stored wording after a rebuild. They are left as they are.
-- Review-app table cells that are not money columns (`*_cents`) still show the raw value. Counts in those tables are not yet passed through `format_count`. IDs and years in those tables stay unformatted, which is correct.
+- Review-app table cells that are not money columns and not recognised as counts (column names such as `awards`, `n_lines`, `present_n`, or ending in `_n` / `_count` / `_lines`) still show the raw value. IDs, years, scores and text stay unformatted, which is correct.
 - CHG-2026-047's unmerged branch on the remote has no merge base with this main and is not used here. Display rules from that earlier work that already sit on main (comma thousands and a point decimal on the public page) are kept and tightened.
 - Operator release notes on other open docs PRs are not edited in this change. After a merge they can use the same format in a later change.
 - STATUS.md is stale relative to recent changes and is not updated here.
@@ -70,7 +80,7 @@ These related choices in this PR were not explicitly settled and remain open for
 ## Testing (evidence, not claims)
 
 - New tests in `tests/test_format.py`, plus updates to `tests/test_number_format.py`, `tests/test_unknowns_by_type_constant.py`, `tests/test_improvements.py` and `tests/test_case_pack.py`.
-- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** in 86.11 s on the first head. Re-run after this documentation-only follow-up (owner decision closing the main open question, 13 Nov 2026 19:30 SAST): **883 passed, 1 skipped** in 85.54 s. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped. The extra passes are the new formatter tests.
+- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** in 86.11 s on the first head. Re-run after the documentation-only follow-up (owner decision closing the main open question, 13 Nov 2026 19:30 SAST): **883 passed, 1 skipped** in 85.54 s. Re-run after this review follow-up (remaining displayed counts and percents, signed zero, and the CHG-2026-056 change-log side fix): **888 passed, 1 skipped** in 89.40 s. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped. The extra passes after this head are the signed-zero test and the static checks that the dashboard has no raw percent concatenation, no stale `pct` precision argument, and that numeric count cells and Present % use the shared formatters.
 - Before and after text snippets were saved under `/workspace/number-format-samples/` (not in git). Example: the headline context line moves from 90.8% to 90.82%; `randText(120000000)` moves from "R1.2 m" to "R1,200,000.00"; a case pack "R750 000" becomes "R750,000.00".
 - `scripts/publish-public-data.sh` was not run.
 
@@ -96,7 +106,7 @@ Close the PR unmerged. If merged: `git revert -m 1 <merge commit>`, then run `uv
 
 ## popia-review verdict: PASS
 
-Diff, new CHG record, change-log row, tests, and the PR description were scanned. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key was introduced. The existing official hotline 0800 701 701 in the case pack is unchanged. No person or supplier is newly named. No identity linking. The owner's exact chat words are not in this change; they stay in the private approval record. Nothing was removed from the diff.
+The first heads, and this review-follow-up diff (dashboard, review-app templates, formatters, tests, change log, and the updated PR description), were scanned. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key was introduced. The existing official hotline 0800 701 701 in the case pack is unchanged. No person or supplier is newly named. No identity linking. The owner's exact chat words are not in this change; they stay in the private approval record. Nothing was removed from the diff.
 
 ## Result
 

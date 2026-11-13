@@ -72,6 +72,18 @@ def test_format_amount_bankers_is_not_used():
     assert format_amount(Decimal("-1.225")) == "-1.23"
 
 
+def test_format_signed_zero():
+    """A value that is or rounds to zero is 0.00 / 0, never -0.00."""
+    assert format_amount(-0.0) == "0.00"
+    assert format_amount(Decimal("-0.00")) == "0.00"
+    assert format_amount(-0.001) == "0.00"
+    assert format_amount(-0.004) == "0.00"
+    assert format_count(-0.0) == "0"
+    assert format_count(Decimal("-0.4")) == "0"
+    assert format_rand(-0.4) == "R0.00"  # -0.4 cents → -R0.004, rounds to R0.00
+    assert format_pct(-0.0) == "0.00%"
+
+
 @pytest.mark.parametrize("value", [None, float("nan"), float("inf"), float("-inf"), "foo", True, False, object()])
 def test_format_amount_and_count_empty_on_invalid(value):
     assert format_amount(value) == ""
@@ -136,7 +148,7 @@ def test_format_pct_parts_half_up_integer_arithmetic():
 
 def test_js_format_helpers_match_python():
     cases = {
-        "amount": [0, 1234.5, 1234567.89, 1234567890.12, -1234.5, 1.225, -1.225, 75.7, 1000000],
+        "amount": [0, 1234.5, 1234567.89, 1234567890.12, -1234.5, 1.225, -1.225, 75.7, 1000000, -0.0, -0.001],
         "count": [0, 8, 1167, 1285, 1234567, -1167, 12.5, -12.5],
         "rand": [0, 75000000, 100000000, 400000000, 123456789012, -123450, 1, -1],
         "pct": [0, 0.757, -0.0125],
@@ -170,7 +182,7 @@ def test_js_pct_parts_match_python():
 def test_page_defines_central_js_helpers():
     assert _BEGIN in PAGE and _END in PAGE
     block = _js_helpers()
-    for name in ("formatAmount", "formatCount", "formatRand", "formatPct", "formatPctParts", "_roundHalfUp"):
+    for name in ("formatAmount", "formatCount", "formatRand", "formatPct", "formatPctParts", "pctPoints", "_roundHalfUp"):
         assert f"function {name}" in block, name
 
 

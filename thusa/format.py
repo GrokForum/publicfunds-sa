@@ -4,7 +4,7 @@ Use these helpers only for text that a person reads: the public site, the review
 case packs, and HTML/Markdown/PDF reports. Do not use them in CSV, JSON, database or
 public-data/v1 export paths. Those stay as plain machine-readable decimals.
 
-Rules (open question in CHG-2026-057, for the owner to confirm):
+Rules (owner decision, 13 Nov 2026 19:30 SAST; exact words are in the private approval record):
 - Money and measured amounts (rands, c/l, the numeric part of a percentage, rates):
   1,234,567.89 — comma thousands, point decimal, exactly two decimals.
 - Whole-number counts (flags, rows, entities, cells): 1,234 — no decimals.
@@ -51,6 +51,8 @@ def format_amount(value) -> str:
     if d is None:
         return ""
     q = d.quantize(_TWO, rounding=ROUND_HALF_UP)
+    if q == 0:
+        q = Decimal("0.00")  # not -0.00
     return f"{q:,.2f}"
 
 
@@ -60,6 +62,8 @@ def format_count(value) -> str:
     if d is None:
         return ""
     q = d.quantize(_ONE, rounding=ROUND_HALF_UP)
+    if q == 0:
+        q = Decimal("0")
     return f"{q:,.0f}"
 
 
@@ -72,6 +76,8 @@ def format_rand(cents) -> str:
     body = format_amount(abs(amount))
     if not body:
         return "unknown"
+    if amount == 0:
+        return "R0.00"
     return f"-R{body}" if amount < 0 else f"R{body}"
 
 
