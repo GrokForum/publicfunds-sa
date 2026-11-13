@@ -494,7 +494,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-# CHG-2026-047 (owner decision): on every public page a number has a comma thousands separator and a point decimal (1,000,000.00; 75.7%).
+# CHG-2026-057 / CHG-2026-047: on every public page a number has a comma thousands separator and a point decimal (1,000,000.00; 75.70%).
 COMMA_DECIMAL = re.compile(r"(?<![\d,.])\d+,\d{1,2}(?![\d,])")          # 90,8 or 1 000,00: a decimal comma
 SPACE_THOUSANDS = re.compile(r"(?<![\d.,])\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?![\d])")   # 1 000 000: space thousands
 

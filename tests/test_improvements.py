@@ -103,10 +103,10 @@ def test_glossary_page_route_nav_and_cited_thresholds():
     html = APP.read_text()
     assert "#\\/glossary$" in html and 'href="#/glossary"' in html
     th = yaml.safe_load((REPO_ROOT / "config" / "detectors.yaml").read_text())["procurement_thresholds"]
-    shown = {"metro": "R750,000", "local": "R300,000", "district": "R200,000"}   # CHG-2026-047: comma thousands on screen
+    shown = {"metro": "R750,000.00", "local": "R300,000.00", "district": "R200,000.00"}   # CHG-2026-057: two decimals on screen
     for k, v in th["mfma"]["rand"].items():
-        assert shown[k] == "R" + f"{v:,}" and shown[k] in html
-    assert "R" + f"{th['pfma']['rand']['department']:,}" in html
+        assert shown[k] == "R" + f"{v:,.2f}" and shown[k] in html
+    assert "R" + f"{th['pfma']['rand']['department']:,.2f}" in html
     for u in ("Municipal%20SCM%20Amendment%20Regulations.pdf", "PFM%20SCM%20Instruction%20No.%2002%20of%202021-22"):
         assert u in html
     for d in ("D1", "D3", "D4", "D5", "D8", "D13", "D6", "D16", "D17"):

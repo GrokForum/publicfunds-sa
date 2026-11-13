@@ -12,6 +12,8 @@ from pathlib import Path
 
 import duckdb
 
+from thusa.format import format_rand
+
 FLAG_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 GOV_BODY_RE = re.compile(r"^(MUN|NAT|BUYER):[A-Za-z0-9_.:-]{1,80}$")
@@ -28,13 +30,7 @@ class WarehouseMissing(RuntimeError):
 
 
 def rand(cents) -> str:
-    if cents is None:
-        return "unknown"
-    v = cents / 100
-    for div, suf in ((1e9, "bn"), (1e6, "m")):
-        if abs(v) >= div:
-            return f"R{v / div:,.2f}{suf}"
-    return f"R{v:,.0f}"
+    return format_rand(cents)
 
 
 def fy_to_fye(label: str | None) -> int | None:

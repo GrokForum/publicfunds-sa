@@ -136,19 +136,88 @@ function el(tag, attrs, ...kids) {
 function safeUrl(u) { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch (e) { return null; } }
 function link(u, text, attrs) { const s = safeUrl(u); return s ? el("a", {href: s, rel: "noopener nofollow", target: "_blank", ...attrs}, text) : el("span", {}, text); }
 function unknown(t) { return el("span", {class: "unknown"}, t || "unknown"); }
-function randText(c) {
-  if (c == null) return null; const v = c / 100, a = Math.abs(v);
-  if (a >= 1e9) return "R" + (v / 1e9).toLocaleString(NUM_LOCALE, {maximumFractionDigits: 2}) + " bn";
-  if (a >= 1e6) return "R" + (v / 1e6).toLocaleString(NUM_LOCALE, {maximumFractionDigits: 1}) + " m";
-  return "R" + v.toLocaleString(NUM_LOCALE, {maximumFractionDigits: 0});
-}
-/* CHG-2026-047 (owner decision): every number on a public page has a comma thousands separator and a point decimal, e.g. 1,000,000.00 and 75.7%. Data files keep plain point decimals. */
+/* format:begin */
+/* CHG-2026-057: display-only number format. Comma thousands, point decimal. Money and
+   measured amounts use exactly two decimals (1,234,567.89); counts use none (1,234).
+   Rounding is half-up (half away from zero), not banker's rounding. A negative rand
+   amount is written -R1,234.50. Do not use these helpers in CSV/JSON data exports. */
 const NUM_LOCALE = "en-US";
-function intg(v) { return v == null ? "" : Number(v).toLocaleString(NUM_LOCALE, {maximumFractionDigits: 0}); }
-function randFull(c) { return c == null ? "" : "R" + (c / 100).toLocaleString(NUM_LOCALE, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function _absPlain(n) {
+  const a = Math.abs(n);
+  let s = String(a);
+  if (!/e/i.test(s)) return s;
+  const m = a.toExponential().match(/^(\d+)(?:\.(\d+))?e([+-]?\d+)$/i);
+  const d = m[1] + (m[2] || ""), e = Number(m[3]), pos = 1 + e;
+  if (pos <= 0) return "0." + "0".repeat(-pos) + d;
+  if (pos >= d.length) return d + "0".repeat(pos - d.length);
+  return d.slice(0, pos) + "." + d.slice(pos);
+}
+function _roundHalfUpParts(value, places) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const sign = n < 0 ? -1 : 1;
+  const s = _absPlain(n);
+  const dot = s.indexOf(".");
+  let intp = dot < 0 ? s : s.slice(0, dot), frac = dot < 0 ? "" : s.slice(dot + 1);
+  intp = intp.replace(/^0+(?=\d)/, "") || "0";
+  if (frac.length < places) frac = frac.padEnd(places, "0");
+  let digits = intp + frac.slice(0, places);
+  const next = frac.slice(places);
+  if (next.length && next[0] >= "5") {
+    const arr = digits.split("");
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (arr[i] < "9") { arr[i] = String(Number(arr[i]) + 1); break; }
+      arr[i] = "0";
+      if (i === 0) arr.unshift("1");
+    }
+    digits = arr.join("");
+  }
+  if (places === 0) return {sign: sign, intp: digits.replace(/^0+(?=\d)/, "") || "0", frac: ""};
+  const cut = digits.length - places;
+  const outInt = cut <= 0 ? "0" : digits.slice(0, cut);
+  const outFrac = cut <= 0 ? digits.padStart(places, "0") : digits.slice(cut);
+  return {sign: sign, intp: outInt.replace(/^0+(?=\d)/, "") || "0", frac: outFrac};
+}
+function _group(intp) { return intp.replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function _roundHalfUp(value, places) {
+  const p = _roundHalfUpParts(value, places);
+  return p == null ? null : p.sign * Number(p.intp + (p.frac ? "." + p.frac : ""));
+}
+function formatAmount(value) {
+  const p = _roundHalfUpParts(value, 2);
+  return p == null ? "" : (p.sign < 0 ? "-" : "") + _group(p.intp) + "." + p.frac;
+}
+function formatCount(value) {
+  const p = _roundHalfUpParts(value, 0);
+  return p == null ? "" : (p.sign < 0 ? "-" : "") + _group(p.intp);
+}
+function formatRand(cents) {
+  if (cents == null || cents === "") return "unknown";
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return "unknown";
+  const body = formatAmount(Math.abs(n) / 100);
+  return body ? (n < 0 ? "-R" : "R") + body : "unknown";
+}
+function formatPct(fraction) {
+  if (fraction == null || fraction === "") return null;
+  const n = Number(fraction);
+  if (!Number.isFinite(n)) return null;
+  const body = formatAmount(n * 100);
+  return body ? body + "%" : null;
+}
+function formatPctParts(c, a) {
+  c = Number(c); a = Number(a);
+  if (!Number.isFinite(c) || !Number.isFinite(a) || a === 0) return "";
+  return formatAmount(Math.floor((20000 * c + a) / (2 * a)) / 100);
+}
+/* format:end */
+function intg(v) { return v == null ? "" : formatCount(v); }
+function randFull(c) { return c == null ? "" : formatRand(c); }
+function randText(c) { return c == null ? "" : formatRand(c); }
 function rand(c) { return c == null ? unknown() : el("span", {title: randFull(c)}, randText(c)); }
-function num(v, d = 2) { return v == null ? "" : Number(v).toLocaleString(NUM_LOCALE, {minimumFractionDigits: d, maximumFractionDigits: d}); }
-function pct(x, d = 1) { return x == null ? null : (x * 100).toLocaleString(NUM_LOCALE, {maximumFractionDigits: d}) + "%"; }
+function num(v) { return v == null ? "" : formatAmount(v); }
+function pct(x) { return x == null ? null : formatPct(x); }
 function fyLabel(fye) { fye = +fye; return `${fye - 1}/${String(fye).slice(-2)}`; }
 function natFy(fy) { fy = +fy; return `${fy}/${String(fy + 1).slice(-2)}`; }
 function dateSast(iso) { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString("en-ZA", {timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short"}) + " SAST"; }
@@ -238,15 +307,15 @@ async function vHome() {
   setView("Where does South Africa's public money go?",
     el("p", {class: "lead"}, "Budgets, spending, audit results and tenders for every municipality and national department - from official open data, with what is missing shown as clearly as what is there."),
     el("div", {class: "grid"},
-      kp(c.complete_pct == null ? "unknown" : c.complete_pct + "%", `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${c.entities} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
+      kp(c.complete_pct == null ? "unknown" : formatAmount(c.complete_pct) + "%", `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
       gap,
-      kp(ctr.municipalities, "municipalities and districts"),
-      kp(ctr.departments, "national departments with budget data"),
-      kp(ctr.awards.toLocaleString(NUM_LOCALE), "tender award records"),
-      kp(ctr.flags_confirmed, `flags confirmed by review · ${ctr.leads_hidden} automated leads still being checked (hidden)`)),
+      kp(intg(ctr.municipalities), "municipalities and districts"),
+      kp(intg(ctr.departments), "national departments with budget data"),
+      kp(intg(ctr.awards), "tender award records"),
+      kp(intg(ctr.flags_confirmed), `flags confirmed by review · ${intg(ctr.leads_hidden)} automated leads still being checked (hidden)`)),
     el("h2", {}, "How fresh is this?"),
     el("div", {class: "card"}, el("p", {}, "Data published ", el("b", {}, dateSast(m.generated_at_sast)), gen != null && gen > 2 ? el("span", {class: "pill bad", style: "margin-left:.5rem"}, "older than our 48-hour target") : el("span", {class: "pill ok", style: "margin-left:.5rem"}, "up to date")),
-      el("p", {class: "small muted"}, `Build ${m.build.id} · data-quality checks: ${m.build.data_quality.pass} passed, ${m.build.data_quality.warn} warning(s), ${m.build.data_quality.fail} failed.`),
+      el("p", {class: "small muted"}, `Build ${m.build.id} · data-quality checks: ${intg(m.build.data_quality.pass)} passed, ${intg(m.build.data_quality.warn)} warning(s), ${intg(m.build.data_quality.fail)} failed.`),
       table("Last new data per source", [
         {label: "Source", render: s => s.name || s.id, value: s => s.name || s.id},
         {label: "Last new data", render: s => s.last_new_data_sast ? dateSast(s.last_new_data_sast) : unknown("none yet"), value: s => s.last_new_data_sast},
@@ -305,7 +374,7 @@ async function vCoverage(params) {
   setView("Data coverage", el("p", {class: "lead"}, "Which official data exists for each municipality and financial year (July–June). Missing data is a finding in itself: it is shown, never hidden or filled in."),
     el("div", {class: "legend"}, Object.entries(STATE).filter(([k]) => k !== "?").map(([k, v]) => el("span", {}, el("i", {class: "s-" + k}), `${SYM[k]} ${v}`))),
     filters, body, el("h2", {}, "Summary"), summary,
-    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct}% of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
+    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct == null ? "unknown" : formatAmount(cov.headline.complete_pct) + "%"} of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
     gapBox(coreGapLines(cov), {link: 1, extra: projectionLines(cov)}));
   draw();
 }
@@ -507,7 +576,7 @@ async function vTools(sub, params) {
     const a = parseFloat(amt.value), f = idx[from.value], t = idx[to.value];
     if (!(a >= 0) || !f || !t) { infOut.replaceChildren(unknown("enter an amount and two months")); return; }
     const res = a * t[1] / f[1];
-    infOut.replaceChildren(el("p", {}, `R${a.toLocaleString(NUM_LOCALE, {maximumFractionDigits: 2})} in ${from.selectedOptions[0].text} is worth about `, el("b", {}, "R" + res.toLocaleString(NUM_LOCALE, {maximumFractionDigits: 2})), ` in ${to.selectedOptions[0].text} prices.`),
+    infOut.replaceChildren(el("p", {}, `R${formatAmount(a)} in ${from.selectedOptions[0].text} is worth about `, el("b", {}, "R" + formatAmount(res)), ` in ${to.selectedOptions[0].text} prices.`),
       el("p", {class: "small muted"}, `CPI ${from.value}: ${num(f[1])} → ${to.value}: ${num(t[1])} (${cpi.base}). Change: ${pct(t[1] / f[1] - 1)}. `, srcLink(pr, t[2], "CPI source")));
   }
   [amt, from, to].forEach(x => x.addEventListener("input", calc));
@@ -629,8 +698,8 @@ function ceilingModel(cov, mun) {
   const SCROLL_HINT = "Swipe or scroll sideways to see all the data types \u2192";   // shown only while the table is wider than its box
   const TENDER_CAPTION = "Tender awards: years before 2021/22 are not counted for most municipalities, so N is about four years per municipality, not six. Most counted municipality-years have no award records loaded, and some awards have no value.";
   const h = cov.headline, yIdx = cov.years.map((y, k) => [y, k]).filter(([y]) => y >= h.fye_min && y <= h.fye_max).map(([, k]) => k);
-  const dec = x => x.toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});   // CHG-2026-047: point decimal, as num() shows (self-contained for the parity test)
-  const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : null;
+  const dec = x => x == null || !Number.isFinite(Number(x)) ? "" : (Number(x) < 0 ? "-" : "") + Math.abs(Number(x)).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});   // CHG-2026-057: two decimals, self-contained for the parity test
+  const pct = (a, b) => b ? Math.round(10000 * a / b) / 100 : null;
   const prov = Object.fromEntries(mun.municipalities.map(m => [m.id, m.province]));
   const emptyYears = dt => CEILING_TYPES.includes(dt) ? yIdx.filter(k => !cov.entities.some(e => e.c[dt][k] === "P")) : [];
   const missingPart = k => {
@@ -678,7 +747,7 @@ function coreGapLines(cov) {
     if (fye < h.fye_min || fye > h.fye_max) return;
     const types = CORE.filter(dt => cov.data_types.includes(dt) && !cov.entities.some(e => e.c[dt][k] === "P")).map(dt => LABEL[dt]);
     if (!types.length) return;
-    const y = byYear[fye], so = y ? `, so ${y.complete} of ${y.applicable} municipalities have complete core data for that year` : "";
+    const y = byYear[fye], so = y ? `, so ${Number(y.complete).toLocaleString("en-US", {maximumFractionDigits: 0})} of ${Number(y.applicable).toLocaleString("en-US", {maximumFractionDigits: 0})} municipalities have complete core data for that year` : "";
     lines.push(`${cov.fy_labels[k]}: no municipality has complete data for ${join(types)} in the data PublicFunds loads today${so}. The headline counts the year as a gap.`);
   });
   return lines;
@@ -688,8 +757,8 @@ function headlineContextLines(cov) {
   const CORE = ["budget", "actual_audited", "uifw", "audit_opinion"];
   const h = cov.headline, byYear = Object.fromEntries((h.by_year || []).map(y => [y.fye, y]));
   const join = p => p.length === 1 ? p[0] : p.slice(0, -1).join(", ") + " and " + p[p.length - 1];
-  const tenths = (c, a) => (Math.floor((2000 * c + a) / (2 * a)) / 10).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});
-  const intg = v => Number(v).toLocaleString("en-US", {maximumFractionDigits: 0});   // CHG-2026-047: same as the page-level intg()
+  const tenths = (c, a) => (Math.floor((20000 * c + a) / (2 * a)) / 100).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});   // CHG-2026-057: two decimals, half-up, self-contained
+  const intg = v => Number(v).toLocaleString("en-US", {maximumFractionDigits: 0});
   const win = [], gaps = [], rest = [];
   cov.years.forEach((fye, k) => {
     if (fye < h.fye_min || fye > h.fye_max) return;
@@ -735,7 +804,7 @@ async function vUnknowns() {
       }
     }
   }
-  const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : null;
+  const pct = (a, b) => b ? Math.round(10000 * a / b) / 100 : null;
   const rows = Object.values(prov).map(P => {
     const tot = Object.values(P.t).reduce((a, T) => ({P: a.P + T.P, p: a.p + T.p, m: a.m + T.m, n: a.n + T.n}), {P: 0, p: 0, m: 0, n: 0});
     const top = Object.entries(P.reasons).sort((a, b) => b[1] - a[1])[0];
@@ -757,13 +826,13 @@ async function vUnknowns() {
     const m = byId[e.id];
     return {id: e.id, name: m.name, code: m.code, province: m.province, ...c, known: pct(c.P, c.n)};
   }).filter(r => r.n).sort((a, b) => a.known - b.known || b.m - a.m || a.name.localeCompare(b.name));
-  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), num(v, 1) + "%");
+  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), num(v) + "%");
   /* CHG-2026-033: what each by-type column measures, n of N in the cell, the years no municipality has complete data for (descriptive, no cause) */
   const R = ceilingModel(cov, mun), DT_AVAIL = R._text.headers;
   const toTrend = e => { e.preventDefault(); const t = $("#trend"), h = $("header");   // the header is sticky and 73-135 px high: land the heading below it
     if (t) { scrollTo({top: t.getBoundingClientRect().top + scrollY - (h ? h.offsetHeight : 0) - 12, behavior: "auto"}); t.focus({preventScroll: true}); } };
   const typeCell = (r, dt) => { const c = r.t[dt]; if (!c || !c.n) return unknown();
-    return el("span", {}, el("span", {class: "pct"}, meter(pct(c.P, c.n))), el("span", {class: "nn", title: `${c.P} of ${c.n} municipality-years`}, `${c.P} of ${c.n}`),
+    return el("span", {}, el("span", {class: "pct"}, meter(pct(c.P, c.n))), el("span", {class: "nn", title: `${intg(c.P)} of ${intg(c.n)} municipality-years`}, `${intg(c.P)} of ${intg(c.n)}`),
       R._text.in_cell[r.code][dt] ? el("span", {class: "hp"}, R._text.in_cell[r.code][dt]) : null); };
   const typeCols = cov.data_types.map(dt => ({label: DT_AVAIL[dt] || DT[dt] || dt, dt, num: 1, wrap: 1, marks: R[dt].empty.map(fy => `${fy}: none complete`),
     render: r => typeCell(r, dt), value: r => r.t[dt] ? pct(r.t[dt].P, r.t[dt].n) : null}));
@@ -831,10 +900,10 @@ async function vChanges() {
     ch.entries.length ? el("div", {}, ch.entries.map(e => el("section", {class: "entry"},
       el("h2", {}, dateSast(e.published_sast)),
       el("ul", {}, e.summary.map(t => el("li", {}, t))),
-      el("p", {class: "small muted"}, `Build ${e.build_id} · data-quality checks: ${e.data_quality.pass} passed, ${e.data_quality.warn} warning(s), ${e.data_quality.fail} failed`,
+      el("p", {class: "small muted"}, `Build ${e.build_id} · data-quality checks: ${intg(e.data_quality.pass)} passed, ${intg(e.data_quality.warn)} warning(s), ${intg(e.data_quality.fail)} failed`,
         e.files_changed.length ? ` · files changed: ${e.files_changed.join(", ")}` : ""),
       el("details", {}, el("summary", {}, "Totals in this build"),
-        el("ul", {class: "small"}, Object.entries(e.counts).map(([k, v]) => el("li", {}, `${lbl[k] || k}: ${Number(v).toLocaleString(NUM_LOCALE)}`, e.count_changes[k] ? ` (${e.count_changes[k] > 0 ? "+" : ""}${e.count_changes[k].toLocaleString(NUM_LOCALE)})` : ""))))))) : el("p", {}, "No entries yet."));
+        el("ul", {class: "small"}, Object.entries(e.counts).map(([k, v]) => el("li", {}, `${lbl[k] || k}: ${intg(v)}`, e.count_changes[k] ? ` (${e.count_changes[k] > 0 ? "+" : "-"}${intg(Math.abs(e.count_changes[k]))})` : ""))))))) : el("p", {}, "No entries yet."));
 }
 
 /* ---------------------------------------------------------------- glossary / plain-language explainers (CHG-2026-013) */
@@ -876,8 +945,8 @@ function vGlossary() {
     term("limits", "Competitive-bidding limits",
       el("p", {}, "Above a set value, a public body must invite competitive bids (an open tender). Up to that value it may buy using written price quotations. Breaking one purchase into smaller ones to stay under the limit is not allowed."),
       el("ul", {},
-        el("li", {}, el("b", {}, "Municipalities (MFMA): "), "R750,000 for metros, R300,000 for local municipalities and R200,000 for district municipalities (VAT included), under the Municipal Supply Chain Management Regulations as amended by Government Gazette 49863 of 14 December 2023."),
-        el("li", {}, el("b", {}, "National and provincial departments (PFMA): "), "R1,000,000 (including all applicable taxes), under National Treasury's PFMA SCM Instruction No. 02 of 2021/22.")),
+        el("li", {}, el("b", {}, "Municipalities (MFMA): "), "R750,000.00 for metros, R300,000.00 for local municipalities and R200,000.00 for district municipalities (VAT included), under the Municipal Supply Chain Management Regulations as amended by Government Gazette 49863 of 14 December 2023."),
+        el("li", {}, el("b", {}, "National and provincial departments (PFMA): "), "R1,000,000.00 (including all applicable taxes), under National Treasury's PFMA SCM Instruction No. 02 of 2021/22.")),
       src(link(MSCM, "Municipal SCM Amendment Regulations (Gazette 49863)"), link(PSCM, "PFMA SCM Instruction No. 02 of 2021/22"))),
     term("etenders", "eTenders",
       el("p", {}, "National Treasury's eTenders portal, where government bodies publish tenders and awards. Its open data (in the Open Contracting Data Standard) is the source of the tender awards on this site. Award records start in 2021, and many have no value or a R0 placeholder; we show those as unknown."),

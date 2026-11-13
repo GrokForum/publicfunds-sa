@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import ListedColormap  # noqa: E402
 from jinja2 import Environment, select_autoescape  # noqa: E402
 
+from thusa.format import format_amount, format_count, format_rand  # noqa: E402
 from thusa.settings import Paths  # noqa: E402
 
 STATE_ORDER = ["present", "partial", "missing", "n.a."]
@@ -36,13 +37,7 @@ def _rows(con, sql, params=None):
 
 
 def rand(cents):
-    if cents is None:
-        return "unknown"
-    v = cents / 100
-    for div, suf in ((1e9, "bn"), (1e6, "m")):
-        if abs(v) >= div:
-            return f"R{v / div:,.1f}{suf}"
-    return f"R{v:,.0f}"
+    return format_rand(cents)
 
 
 def headline(con) -> dict:
@@ -181,10 +176,10 @@ INDEX = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Thu
 Flags that name a supplier are <b>pending human review</b> and are not published. Blank means unknown, never zero.</div>
 <h2>Coverage headline</h2>
 <div class="kpis">
-<div class="kpi"><b>{{ h.complete_pct }}%</b><span>municipality-years with complete core data<br>({{ h.complete }} of {{ h.applicable }}; {{ h.entities }} municipalities, {{ h.fye_min - 1 }}/{{ (h.fye_min|string)[-2:] }}-{{ h.fye_max - 1 }}/{{ (h.fye_max|string)[-2:] }})</span></div>
-<div class="kpi"><b>{{ h.partial }}</b><span>partial municipality-years</span></div>
-<div class="kpi"><b>{{ h.missing }}</b><span>missing municipality-years</span></div>
-{% for t in types %}<div class="kpi"><b>{{ h.by_type[t].present_pct }}%</b><span>{{ labels[t] }} present</span></div>{% endfor %}
+<div class="kpi"><b>{{ amount(h.complete_pct) }}%</b><span>municipality-years with complete core data<br>({{ count(h.complete) }} of {{ count(h.applicable) }}; {{ count(h.entities) }} municipalities, {{ h.fye_min - 1 }}/{{ (h.fye_min|string)[-2:] }}-{{ h.fye_max - 1 }}/{{ (h.fye_max|string)[-2:] }})</span></div>
+<div class="kpi"><b>{{ count(h.partial) }}</b><span>partial municipality-years</span></div>
+<div class="kpi"><b>{{ count(h.missing) }}</b><span>missing municipality-years</span></div>
+{% for t in types %}<div class="kpi"><b>{{ amount(h.by_type[t].present_pct) }}%</b><span>{{ labels[t] }} present</span></div>{% endfor %}
 </div>
 <p class="muted">Core data = budget (original + adjusted), audited actuals, unauthorised/irregular/fruitless & wasteful expenditure,
 and audit opinion. The headline counts only financial years whose audits are already due (as of {{ s.as_of }}); later years appear in the
@@ -192,7 +187,7 @@ table below as budget-only. eTenders awards are shown separately and are not in 
 <div class="grid2"><div><img src="../coverage_by_type.png" alt="coverage by data type and year"></div>
 <div><img src="../flags_summary.png" alt="flags summary"></div></div>
 <h2>Coverage by year</h2><table><tr><th>Financial year</th><th>Applicable municipality-years</th><th>Complete</th><th>%</th><th>Note</th></tr>
-{% for y in h.by_year %}<tr><td>{{ y.fy_label }}</td><td>{{ y.applicable }}</td><td>{{ y.complete }}</td><td>{{ (100*y.complete/y.applicable)|round(1) if y.applicable else 'n.a.' }}</td><td><small>{{ '' if y.all_core_due else 'audits not yet due: budget only, excluded from headline' }}</small></td></tr>{% endfor %}</table>
+{% for y in h.by_year %}<tr><td>{{ y.fy_label }}</td><td>{{ count(y.applicable) }}</td><td>{{ count(y.complete) }}</td><td>{{ amount(100*y.complete/y.applicable) if y.applicable else 'n.a.' }}</td><td><small>{{ '' if y.all_core_due else 'audits not yet due: budget only, excluded from headline' }}</small></td></tr>{% endfor %}</table>
 <h2>Top flags (unreviewed)</h2>
 <table><tr><th>Severity</th><th>Detector</th><th>Flag</th><th>Period</th><th>Status</th><th>Evidence</th></tr>
 {% for f in flags %}<tr><td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td><td>{{ f.detector_id.split('_')[0] }}</td>
@@ -220,7 +215,7 @@ MUNI = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{{ m
 <h2>Flags ({{ flags|length }}, unreviewed)</h2><table><tr><th>Severity</th><th>Flag</th><th>Status</th><th>Evidence</th></tr>
 {% for f in flags %}<tr><td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td><td><b>{{ f.title }}</b><br><small>{{ f.explanation }}</small></td><td><span class="rev">{{ f.review_status }}</span></td>
 <td>{% for e in f.evidence %}{% if e.url %}<a href="{{ e.url }}">{{ e.label }}</a>{% else %}{{ e.label }}{% endif %}<br>{% endfor %}</td></tr>{% else %}<tr><td colspan=4>No flags.</td></tr>{% endfor %}</table>
-<h2>eTenders awards matched to this municipality</h2><p>{{ aw.n }} award-supplier rows, {{ aw.valued }} with a usable value, total known value {{ rand(aw.total) }}.</p>
+<h2>eTenders awards matched to this municipality</h2><p>{{ count(aw.n) }} award-supplier rows, {{ count(aw.valued) }} with a usable value, total known value {{ rand(aw.total) }}.</p>
 <p class="muted">Lineage: every number above comes from curated tables carrying source, file, sha256 and fetch time (see warehouse).</p>
 </main></body></html>"""
 
@@ -239,6 +234,8 @@ def render(paths: Paths, screenshot: bool = True) -> dict:
     chart_flags(con, dist / "flags_summary.png")
     env = Environment(autoescape=select_autoescape(default=True, default_for_string=True))
     env.globals["rand"] = rand
+    env.globals["amount"] = format_amount
+    env.globals["count"] = format_count
     flags = _rows(con, """SELECT * FROM marts.flag ORDER BY
         CASE severity WHEN 'high' THEN 0 WHEN 'med' THEN 1 WHEN 'low' THEN 2 ELSE 3 END, score DESC""")
     for f in flags:
