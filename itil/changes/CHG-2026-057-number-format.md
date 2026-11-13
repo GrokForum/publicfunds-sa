@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | Owner RFC for number display format, 13 Nov 2026 19:17 SAST; scope confirmed later that evening, as reported to the author (PublicFunds). This is approval to prepare an RFC and PR, not a merge GO. Exact words are in the private approval record. |
+| Requested by / date (SAST) | Owner RFC for number display format, 13 Nov 2026 19:17 SAST; scope confirmed later that evening, as reported to the author (PublicFunds). Main open question closed by owner decision, 13 Nov 2026 19:30 SAST (scope decision, not a merge GO). Exact words are in the private approval record. |
 | Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
 | Type | **Normal-medium**. See "Why this type". |
 | Environment | DEV only (branch `feat/chg-2026-057-number-format` from origin/main). Nothing pushed to main. Public data is not changed in this PR. No publish script was run. |
@@ -20,17 +20,21 @@
 
 Show every number that a person reads in one standard form. Keep machine-readable data files as plain decimals.
 
-## Open question (for the owner to confirm)
+## Owner decision (main open question CLOSED)
 
-This change uses the following reading of the RFC. It is an open question until the owner confirms it.
+Owner decision, 13 Nov 2026 19:30 SAST, as reported to the author (PublicFunds). Exact words are in the private approval record. This is a scope decision, not a merge GO.
+
+The main open question is **CLOSED**. It matches what this PR already builds:
 
 - Money and measured amounts (rands, c/l, the numeric part of a percentage, rates) are shown as 1,234,567.89: comma thousands, a point decimal, and exactly two decimals.
 - Whole-number counts (flags, rows, entities, cells) are shown as 1,234, with no decimals.
 - Years, dates, financial-year labels, IDs, SHAs, build IDs, change and incident numbers, and version numbers are left unchanged.
 
-This replaces space thousands and comma decimals in display text (for example a case pack "R750 000" becomes R750,000.00). It also settles the comma-versus-point decimal question that earlier held work was waiting on: the display decimal is a point.
+This replaces space thousands and comma decimals in display text (for example a case pack "R750 000" becomes R750,000.00). The display decimal is a point.
 
-Related choices made in this PR, also for the owner to confirm or amend:
+## Still open (related choices)
+
+These related choices in this PR were not explicitly settled and remain open for the owner to confirm or amend:
 
 - Rounding is Decimal ROUND_HALF_UP (half away from zero), not banker's rounding. Example: 1.225 → 1.23 and -1.225 → -1.23.
 - A negative number uses a leading ASCII hyphen-minus (U+002D). A rand amount puts the minus before the R: -R1,234.50. Parentheses and en-dashes are not used.
@@ -66,14 +70,14 @@ Related choices made in this PR, also for the owner to confirm or amend:
 ## Testing (evidence, not claims)
 
 - New tests in `tests/test_format.py`, plus updates to `tests/test_number_format.py`, `tests/test_unknowns_by_type_constant.py`, `tests/test_improvements.py` and `tests/test_case_pack.py`.
-- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** in 86.11 s. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped. The extra passes are the new formatter tests.
+- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** in 86.11 s on the first head. Re-run after this documentation-only follow-up (owner decision closing the main open question, 13 Nov 2026 19:30 SAST): **883 passed, 1 skipped** in 85.54 s. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped. The extra passes are the new formatter tests.
 - Before and after text snippets were saved under `/workspace/number-format-samples/` (not in git). Example: the headline context line moves from 90.8% to 90.82%; `randText(120000000)` moves from "R1.2 m" to "R1,200,000.00"; a case pack "R750 000" becomes "R750,000.00".
 - `scripts/publish-public-data.sh` was not run.
 
 ## Risk
 
 - South African readers often see a decimal comma and space thousands. The owner chose comma thousands and a point decimal, with two decimals for amounts. A reader can misread a number if one page or report keeps the old form. The dashboard_check scan still fails on a decimal comma or space thousands in public page text.
-- Showing a stored one-decimal figure as two decimals (75.7 → 75.70%) can hide that the stored value was rounded to one decimal. This is recorded in the open question.
+- Showing a stored one-decimal figure as two decimals (75.7 → 75.70%) can hide that the stored value was rounded to one decimal. This remains among the related choices that are still open.
 - Withdrawing "R1.2 m" makes some dashboard figures longer. Chart axis labels may wrap. That is accepted in this change so that one format is used.
 - Does it change which suppliers or people are flagged publicly? **No.** Only how numbers are written for a reader. No detector or publication rule changes.
 - POPIA / licence impact: none. No new personal information. Exact owner words are not in this change.
