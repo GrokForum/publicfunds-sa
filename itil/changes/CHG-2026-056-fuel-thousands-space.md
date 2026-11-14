@@ -5,7 +5,7 @@
 | Requested by / date (SAST) | Owner go-ahead to prepare the fix PR, 12 Nov 2026 07:28 SAST, as reported to the author (PublicFunds). This is not a merge GO. |
 | Status | Implemented / closed. Merged 13 Nov 2026 19:16 SAST as `8cdf9ad6` (PR #5, exact head `5db0c8c1`, tag `snapshot-2026-11-13-1917`). Owner GO, 13 Nov 2026, confirmed 14 Nov 2026, as reported to the author (PublicFunds). Exact words are in the private approval record. The 14 Nov 2026 nightly succeeded (B20261114T005655Z). INC-2026-004 is closed. Recorded by CHG-2026-058. |
 | Type | **Normal** (parser change). After a merge, the next successful nightly will publish the November 2026 fuel row that now crashes the build. |
-| Environment | DEV only (branch `fix/chg-2026-056-fuel-thousands-space` from origin/main). Nothing pushed to main. Public data is not changed in this PR. |
+| Environment | Merged and live. Merged 13 Nov 2026 19:16 SAST as `8cdf9ad6` (PR #5, exact head `5db0c8c1`, tag `snapshot-2026-11-13-1917`). The 14 Nov 2026 nightly succeeded (build B20261114T005655Z) and is what the live site serves. |
 | CIs affected | `thusa/parsers.py` (`fuel_history_rows`, new `_fuel_history_number`); `tests/test_publish_data.py`; this record; `itil/registers/change-log.md`; INC-2026-004 |
 | Linked records | INC-2026-004 |
 | Rollback | Close the PR unmerged. If ever merged: `git revert -m 1 <merge commit>`. Git history is the rollback; no .bkp files. |
