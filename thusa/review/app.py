@@ -23,7 +23,7 @@ from thusa.review import security as sec
 from thusa.review import workflow as wf
 from thusa.review.service import Service, to_csv
 from thusa.review.store import SAST, sast_label
-from thusa.format import format_amount, format_count
+from thusa.format import format_amount, format_count, is_count_column
 from thusa.review.warehouse import DATA_TYPES, SEVERITIES, TYPE_LABEL, WarehouseMissing, rand
 from thusa.settings import Paths, get_paths
 
@@ -92,7 +92,7 @@ def create_app(paths: Paths | None = None, allowed_hosts: list[str] | None = Non
     tpl = Jinja2Templates(directory=HERE / "templates")
     tpl.env.filters.update(rand=rand, count=format_count, amount=format_amount, sast=_fmt_ts, safe_url=_safe_url, tojson_pretty=lambda v: json.dumps(
         v, indent=1, ensure_ascii=False, default=str))
-    tpl.env.globals.update(TYPE_LABEL=TYPE_LABEL, DECISION_LABELS=wf.DECISION_LABELS, STATUSES=wf.STATUSES)
+    tpl.env.globals.update(TYPE_LABEL=TYPE_LABEL, DECISION_LABELS=wf.DECISION_LABELS, STATUSES=wf.STATUSES, is_count_column=is_count_column)
 
     # ------------------------------------------------------------------ auth helpers
     def client_ip(request: Request) -> str:

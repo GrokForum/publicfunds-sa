@@ -13,8 +13,6 @@ from __future__ import annotations
 import math
 import re
 
-from thusa.format import format_amount, format_count, format_pct_parts
-
 # Types for which an empty year is assessed. Tender awards are left out on the reviewers' advice (CHG-2026-033, decision 3): the one
 # empty year the rule found for them (2020/21, 13 partly loaded awards) made a ceiling of ~100% sit next to a share of ~7%.
 # To restore it, add "procurement" here and in the CEILING_TYPES constant of the page block (the parity test fails until both agree).
@@ -48,7 +46,7 @@ def jargon(text):
 
 
 def pct(a, b):
-    return math.floor(10000 * a / b + 0.5) / 100 if b else None     # two decimals; same rounding as the page's Math.round
+    return math.floor(1000 * a / b + 0.5) / 10 if b else None      # same rounding as the page's Math.round
 
 
 def window(cov):
@@ -122,8 +120,8 @@ def ceiling(c):
 
 
 def dec(x):
-    """Two decimals with a point decimal and comma thousands, as the page shows percentages (83.30%)."""
-    return format_amount(x)
+    """One decimal with a point decimal and comma thousands, as the page shows percentages (83.3%)."""
+    return f"{x:,.1f}"
 
 
 def range_text(vals):
@@ -173,7 +171,7 @@ def core_gap_lines(cov):
         if not types:
             continue
         y = by_year.get(cov["years"][k])
-        so = (f", so {format_count(y['complete'])} of {format_count(y['applicable'])} municipalities have complete core data for that year" if y else "")
+        so = f", so {y['complete']} of {y['applicable']} municipalities have complete core data for that year" if y else ""
         lines.append(f"{cov['fy_labels'][k]}: no municipality has complete data for {_join(types)} in the data PublicFunds loads today"
                      f"{so}. The headline counts the year as a gap.")
     return lines
@@ -185,11 +183,8 @@ def _comma(x):
 
 
 def _tenths(c, a):
-    """c / a as a percentage with two decimals, rounded half up with integer arithmetic (same in Python and the page).
-
-    The name is historical (CHG-2026-047 used one decimal). CHG-2026-057 uses two.
-    """
-    return format_pct_parts(c, a)
+    """c / a as a percentage with one decimal, rounded half up with integer arithmetic (same in Python and the page)."""
+    return f"{(2000 * c + a) // (2 * a) / 10:.1f}"
 
 
 def _span(labels):
@@ -213,12 +208,12 @@ def headline_context_lines(cov):
     a = sum(by_year[cov["years"][k]]["applicable"] for k in rest)
     alone = _span(labels(rest)) if rest == list(range(rest[0], rest[-1] + 1)) else _join(labels(rest))
     lines = [f"Includes {_join(labels(gaps))}, for which no municipality has complete data in what PublicFunds has loaded. "
-             f"{alone} alone: {_comma(_tenths(c, a))}% ({format_count(c)} of {format_count(a)} municipality-years)."]
+             f"{alone} alone: {_comma(_tenths(c, a))}% ({c:,} of {a:,} municipality-years)."]
     nxt = by_year.get(h["fye_max"] + 1)
     if nxt and nxt.get("all_core_due") is False:
         hc, ha = h["complete"], h["applicable"] + nxt["applicable"]
         lines.append(f"Projection, not data: from the first data update on or after 1 December {nxt['fye']}, the year {nxt['fy']} counts in "
                      f"the headline. If it then looks like {cov['fy_labels'][gaps[-1]]} does today (no municipality with complete data), "
-                     f"the headline would fall to about {_comma(_tenths(hc, ha))}% ({format_count(hc)} of {format_count(ha)} municipality-years), because {nxt['fy']} would "
+                     f"the headline would fall to about {_comma(_tenths(hc, ha))}% ({hc:,} of {ha:,} municipality-years), because {nxt['fy']} would "
                      f"count as a gap, not because anything got worse, if nothing else changes.")
     return lines

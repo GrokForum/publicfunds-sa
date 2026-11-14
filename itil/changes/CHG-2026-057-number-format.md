@@ -2,12 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | Owner RFC for number display format, 13 Nov 2026 19:17 SAST; scope confirmed later that evening, as reported to the author (PublicFunds). Main open question closed by owner decision, 13 Nov 2026 19:30 SAST (scope decision, not a merge GO). Exact words are in the private approval record. |
+| Requested by / date (SAST) | Owner RFC for number display format, 13 Nov 2026 19:17 SAST; scope confirmed later that evening, as reported to the author (PublicFunds). Main open question closed by owner decision, 13 Nov 2026 19:30 SAST. Style choices closed by owner decision, 14 Nov 2026 16:46 SAST. Both are scope/style decisions, not a merge GO. Exact words are in the private approval record. |
 | Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
 | Type | **Normal-medium**. See "Why this type". |
 | Environment | DEV only (branch `feat/chg-2026-057-number-format` from origin/main). Nothing pushed to main. Public data is not changed in this PR. No publish script was run. |
-| CIs affected | New `thusa/format.py`; `apps/public-dashboard/index.html`; `thusa/coverage_ceiling.py`; `thusa/review/casepack.py`; `thusa/review/warehouse.py`; `thusa/review/app.py`; review-app templates; `thusa/report.py`; `thusa/publish.py`; `scripts/dashboard_check.py` (comment only); tests listed below; this record; `itil/registers/change-log.md` |
-| Linked records | CHG-2026-047 (public-page comma thousands and point decimal; this change extends that rule and tightens amount decimals), old-repo work that was waiting on the comma-versus-point decimal question |
+| CIs affected | New `thusa/format.py`; `apps/public-dashboard/index.html`; `thusa/review/casepack.py`; `thusa/review/warehouse.py`; `thusa/review/app.py`; review-app templates; `thusa/report.py`; `thusa/publish.py`; `scripts/dashboard_check.py` (comment only); tests listed below; this record; `itil/registers/change-log.md` |
+| Linked records | CHG-2026-047 (public-page comma thousands and point decimal; this change extends that rule to reports and the review app), old-repo work that was waiting on the comma-versus-point decimal question |
 | Rollback | Close the PR unmerged. If ever merged: `git revert -m 1 <merge commit>`. Git history is the rollback; no .bkp files. |
 
 ## Why this type is Normal-medium
@@ -26,23 +26,36 @@ Owner decision, 13 Nov 2026 19:30 SAST, as reported to the author (PublicFunds).
 
 The main open question is **CLOSED**. It matches what this PR already builds:
 
-- Money and measured amounts (rands, c/l, the numeric part of a percentage, rates) are shown as 1,234,567.89: comma thousands, a point decimal, and exactly two decimals.
+- Money and measured amounts are shown in the 1,234,567.89 style: comma thousands and a point decimal. The number of decimals follows the style decisions below (money in cents: exactly two).
 - Whole-number counts (flags, rows, entities, cells) are shown as 1,234, with no decimals.
 - Years, dates, financial-year labels, IDs, SHAs, build IDs, change and incident numbers, and version numbers are left unchanged.
 
 This replaces space thousands and comma decimals in display text (for example a case pack "R750 000" becomes R750,000.00). The display decimal is a point.
 
-## Still open (related choices)
+## Owner style decisions (CLOSED)
 
-These related choices in this PR were not explicitly settled and remain open for the owner to confirm or amend:
+Owner decisions, 14 Nov 2026 16:46 SAST, given directly by the owner. Exact words are in the private approval record. These are style decisions, not a merge GO. Every style item that the earlier heads listed as open is now **CLOSED**:
 
-- Rounding is Decimal ROUND_HALF_UP (half away from zero), not banker's rounding. Example: 1.225 → 1.23 and -1.225 → -1.23.
-- A negative number uses a leading ASCII hyphen-minus (U+002D). A rand amount puts the minus before the R: -R1,234.50. Parentheses and en-dashes are not used.
-- Compact abbreviations such as "R1.2 m" and "R1.50bn" are withdrawn on screen and in reports. The full form is used instead (R1,200,000.00).
-- A percentage already stored in public data with one decimal (for example coverage `complete_pct` 75.7) is shown as 75.70%. The stored file is not recomputed.
-- Short prose such as "R10 million", "20%" and "R0" / "R100" in glossary and detector descriptions is left as it was, except where a digit group already used space thousands (the bidding limits and the 2,500 HHI threshold).
+1. **Short forms: CLOSED.** Two contexts. TABLES (figures that are listed or added up: dashboard tables, review-app tables, report and case-pack tables) show the full figure: R1,234,567.89 for rand, 1,234 for counts. PROSE and headline text (sentences, cards, summary lines) may use a readable short form: R1.2 m, R3.45 bn. Where the exact value matters in prose (a flag's evidence amount, a threshold such as the bidding limits), the full figure is shown.
+2. **Coverage percentages: CLOSED.** Percentages show the precision the data holds. Coverage stored as 75.7 shows as 75.7%, not 75.70%; Present % 81.9 shows as 81.9%. Percentages are not padded to two decimals.
+3. **Rounding: CLOSED.** The formatter adds no rounding. It shows a value at its source precision. Money held in integer cents shows exactly two decimals, because that is the data's precision. A value whose precision is set by the data or by a documented calculation keeps that precision. The ROUND_HALF_UP rule of the earlier heads is removed from the formatter.
+4. **Negatives: CLOSED.** A negative rand amount stays -R1,234.50 (ASCII hyphen-minus before the R). Zero is never signed: -0.0 shows as 0.00 (R0.00 for money).
+5. **Data files: unchanged.** CSV, JSON, the database, public-data/v1 and the manifest stay plain decimals.
+6. **Short prose words** such as "R10 million" and "20%" stay as they are (readability in words).
+
+## For the owner (readings this change was not sure of)
+
+These are explicit questions, not open defects. The PR implements the reading shown; the owner can confirm or amend it.
+
+- **Q1. The short form drops digits.** "R1.2 m" cannot show every digit. The short form keeps the public page's rule from before CHG-2026-057: one decimal for millions, up to two for billions, trailing zeros dropped, and the dropped part rounded half away from zero (as the page's `toLocaleString` did). This is the only place a display helper drops digits, and only in prose; the full figure stays in the table and in the hover title. Is that the intended reading of "keep short forms"?
+- **Q2. Amounts under R1 million in prose** are shown in full (R123,456.78), not as whole rand (the page showed R123,457 before). This avoids rounding. Confirm.
+- **Q3. "Unless the decimals or integers are important, e.g. space delimited."** Read as: where the exact value matters (thresholds, evidence amounts), show the full figure, with comma thousands, never space thousands. The bidding limits therefore stay R750,000.00. Confirm.
+- **Q4. Calculations that already round.** Some figures are computed with an existing, documented rule before any formatter sees them: stored coverage percentages use one decimal (Python `round`); the headline context lines use one decimal with integer half-up arithmetic (CHG-2026-047); the page's by-type and province ratios use `Math.round` to one decimal (CHG-2026-033); computed ratios on the page (spending against budget, CPI change, fuel difference) use one decimal as before; computed rand results (inflation tool, fuel difference) are taken to the cent. This change keeps each existing rule and does not change any data calculation. Should a later change make these calculation rules the same everywhere?
+- **Q5. Detector flag text.** `thusa/detectors.py` writes amounts into stored flag titles and explanations as whole rand (`R{cents/100:,.0f}`). That text is data, not display, and is not changed here. A flag's evidence amount is shown in full in the evidence tables. Should a later change store the full figure in the flag text?
 
 ## What changed
+
+Items 1–5 and the review follow-up describe the earlier heads. Where they say two decimals, half-up rounding, `format_pct_parts` or 81.90%, the owner style follow-up below replaces them.
 
 1. New module `thusa/format.py` with `format_amount`, `format_count`, `format_rand` (from cents), `format_pct` (from a fraction) and `format_pct_parts` (from complete/applicable counts, half-up with integer arithmetic).
 2. The public dashboard has a matching JS block (`/* format:begin */` … `/* format:end */` in `apps/public-dashboard/index.html`): `formatAmount`, `formatCount`, `formatRand`, `formatPct`, `formatPctParts`. The existing helpers `num`, `pct`, `intg`, `randFull`, `randText` and `rand` call those functions. The by-type parity block stays self-contained and now uses two decimals.
@@ -50,7 +63,7 @@ These related choices in this PR were not explicitly settled and remain open for
 4. Case-pack bidding limits and the HHI threshold use comma thousands and, for rand amounts, two decimals.
 5. Tests: new `tests/test_format.py` (negatives, zero, large values, ROUND_HALF_UP versus banker's rounding, None/NaN/infinities, Python/JS parity, and a proof that public-data JSON/CSV stay plain and that `thusa/publish_data.py` does not import the display helpers). Existing number-format, glossary, case-pack and by-type tests were updated for the two-decimal display.
 
-### Review follow-up (this head)
+### Review follow-up (head 394b3e4e)
 
 The first reviewer passed the code and asked for a fresh head that covers every displayed number.
 
@@ -59,6 +72,16 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 3. Stale second arguments such as `pct(share, 0)` are removed.
 4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). Related choices stay open.
 5. Optional: `format_amount(-0.0)` and any value that rounds to zero show `0.00`, never `-0.00`, with a test. The CHG-2026-056 change-log row, which still said the PR was not merged, now records the merge of PR #5 at 13 Nov 2026 19:16 SAST (merge 8cdf9ad6). That side fix is documentation only.
+
+### Owner style follow-up (this head, replaces the rounding and padding above)
+
+Implements the owner style decisions of 14 Nov 2026 16:46 SAST:
+
+1. `thusa/format.py` and the page block (`/* format:begin */` … `/* format:end */`) no longer round. `format_amount(value, places=0)` / `formatAmount` show source precision; `places` only pads with zeros. `format_rand` / `formatRand` show the full figure from cents (two decimals). New `format_rand_short` / `formatRandShort` give the prose short form. `format_pct` / `formatPct` shift a stored fraction exactly (0.9707 → 97.07%, 0.5 → 50%). New `format_pct_points` / `pctPoints` take a percentage-point value and an optional calculation precision. `format_pct_parts` / `formatPctParts` (a rounding helper) are removed. New `is_count_column` is shared by review-app and case-pack tables.
+2. Dashboard: tables use `randCell` (full figure); prose and cards use `rand` (short form, full figure in the hover title); chart axis labels use the short form, chart hover titles the full figure. Coverage 75.7%, Present % 81.9% (one decimal, the stored calculation's precision). Computed ratios use `ratioPct` (one decimal, the page's rule before this change); computed rand results use `toCent`. The fuel price is shown from cents without a float division.
+3. `thusa/coverage_ceiling.py` and the page's by-type and context-line calculations are back to their documented one-decimal rule (as on main): 90.8%, 64.9%, 83.3%.
+4. Reports: `thusa/report.py` tables keep the full figure; the eTenders summary sentence uses `rand_short`. Report, snapshot and review-app coverage percentages use one decimal (75.7%). Case-pack table counts now use 1,234.
+5. Thresholds in prose (bidding limits, HHI 2,500) keep the full figure.
 
 ## Stays the same
 
@@ -70,7 +93,7 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 
 ## Seen, not touched
 
-- `thusa/detectors.py` still formats amounts in stored flag titles and explanations with one helper of its own (`R{cents/100:,.0f}`). Those strings are warehouse (and later export) content. A later change can show them in the standard display form without rewriting stored data, or can change the stored wording after a rebuild. They are left as they are.
+- `thusa/detectors.py` still formats amounts in stored flag titles and explanations with one helper of its own (`R{cents/100:,.0f}`). Those strings are warehouse (and later export) content. They are left as they are (see Q5).
 - Review-app table cells that are not money columns and not recognised as counts (column names such as `awards`, `n_lines`, `present_n`, or ending in `_n` / `_count` / `_lines`) still show the raw value. IDs, years, scores and text stay unformatted, which is correct.
 - CHG-2026-047's unmerged branch on the remote has no merge base with this main and is not used here. Display rules from that earlier work that already sit on main (comma thousands and a point decimal on the public page) are kept and tightened.
 - Operator release notes on other open docs PRs are not edited in this change. After a merge they can use the same format in a later change.
@@ -80,15 +103,17 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 ## Testing (evidence, not claims)
 
 - New tests in `tests/test_format.py`, plus updates to `tests/test_number_format.py`, `tests/test_unknowns_by_type_constant.py`, `tests/test_improvements.py` and `tests/test_case_pack.py`.
-- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** in 86.11 s on the first head. Re-run after the documentation-only follow-up (owner decision closing the main open question, 13 Nov 2026 19:30 SAST): **883 passed, 1 skipped** in 85.54 s. Re-run after this review follow-up (remaining displayed counts and percents, signed zero, and the CHG-2026-056 change-log side fix): **888 passed, 1 skipped** in 89.40 s. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped. The extra passes after this head are the signed-zero test and the static checks that the dashboard has no raw percent concatenation, no stale `pct` precision argument, and that numeric count cells and Present % use the shared formatters.
-- Before and after text snippets were saved under `/workspace/number-format-samples/` (not in git). Example: the headline context line moves from 90.8% to 90.82%; `randText(120000000)` moves from "R1.2 m" to "R1,200,000.00"; a case pack "R750 000" becomes "R750,000.00".
+- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** on the first head (86.11 s) and on the documentation follow-up (85.54 s); **888 passed, 1 skipped** on the review follow-up (89.40 s); **905 passed, 1 skipped** (83.82 s) on this owner-style head. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped.
+- This head's tests: no rounding in the formatter (Python source scan and JS block scan, the short form excepted), source precision and pad-only `places`, signed zero, full rand in tables (every table column with a rand CSV value renders `randCell`), short form in prose, coverage 75.7% and no 75.70% / 81.90% left, stored shares at stored precision, Python/JS parity for all helpers including the short form, report tables full and report prose short, and the count-column rule.
+- `scripts/dashboard_check.py` (headless browser check) was not run on this box: the optional Playwright group is not installed. Its number scan is covered by `tests/test_number_format.py::test_dashboard_check_number_scan`.
+- Before and after text snippets were saved under `/workspace/number-format-samples/` (not in git). This head (`style-before-after.txt`): table R1,200,000.00 (unchanged); prose R1,200,000.00 → R1.2 m and R3,450,000,000.00 → R3.45 bn; coverage 75.70% → 75.7%; Present % 81.90% → 81.9%; share 50.00% → 50%; negative -R1,234.50 (unchanged); headline context 90.82% → 90.8% (as on main). A case pack "R750 000" still becomes "R750,000.00".
 - `scripts/publish-public-data.sh` was not run.
 
 ## Risk
 
-- South African readers often see a decimal comma and space thousands. The owner chose comma thousands and a point decimal, with two decimals for amounts. A reader can misread a number if one page or report keeps the old form. The dashboard_check scan still fails on a decimal comma or space thousands in public page text.
-- Showing a stored one-decimal figure as two decimals (75.7 → 75.70%) can hide that the stored value was rounded to one decimal. This remains among the related choices that are still open.
-- Withdrawing "R1.2 m" makes some dashboard figures longer. Chart axis labels may wrap. That is accepted in this change so that one format is used.
+- South African readers often see a decimal comma and space thousands. The owner chose comma thousands and a point decimal. A reader can misread a number if one page or report keeps the old form. The dashboard_check scan still fails on a decimal comma or space thousands in public page text.
+- The same amount can appear as R1,200,000.00 in a table and R1.2 m in a sentence on the same page. That is the owner's decision (tables full, prose readable); the hover title on the page shows the full figure.
+- Showing source precision means two figures in one column can have different numbers of decimals (for example a share of 50% next to 97.07%). That follows the owner's decision not to pad percentages.
 - Does it change which suppliers or people are flagged publicly? **No.** Only how numbers are written for a reader. No detector or publication rule changes.
 - POPIA / licence impact: none. No new personal information. Exact owner words are not in this change.
 
@@ -106,7 +131,7 @@ Close the PR unmerged. If merged: `git revert -m 1 <merge commit>`, then run `uv
 
 ## popia-review verdict: PASS
 
-The first heads, and this review-follow-up diff (dashboard, review-app templates, formatters, tests, change log, and the updated PR description), were scanned. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key was introduced. The existing official hotline 0800 701 701 in the case pack is unchanged. No person or supplier is newly named. No identity linking. The owner's exact chat words are not in this change; they stay in the private approval record. Nothing was removed from the diff.
+The first heads, the review-follow-up diff, and this owner-style diff (formatters, dashboard, reports, review app, case pack, tests, change log, this record and the updated PR description) were scanned. The owner's 14 Nov 2026 words are only in the private approval record. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key was introduced. The existing official hotline 0800 701 701 in the case pack is unchanged. No person or supplier is newly named. No identity linking. The owner's exact chat words are not in this change; they stay in the private approval record. Nothing was removed from the diff.
 
 ## Result
 

@@ -33,7 +33,7 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 .lead{border-style:dashed;background:#fafbfc}.lbl{font-size:.78rem;font-weight:600;text-transform:uppercase;color:#5d6670}
 small{color:#5d6670}</style></head><body>
 <h1>Thusa: South African public-spending data - public snapshot</h1>
-<p class="banner">Generated {{ generated }} from build {{ build_id }}. Coverage: <b>{{ amount(h.complete_pct) }}%</b> of
+<p class="banner">Generated {{ generated }} from build {{ build_id }}. Coverage: <b>{{ amount(h.complete_pct, 1) }}%</b> of
 municipality-years have complete core data ({{ count(h.complete) }} of {{ count(h.applicable) }}; {{ count(h.entities) }} municipalities).
 Flags are automated indicators checked by people; a published flag means reviewers confirmed the data pattern is real,
 <b>not</b> that anyone acted unlawfully.</p>

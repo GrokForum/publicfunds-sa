@@ -137,10 +137,12 @@ function safeUrl(u) { try { const x = new URL(u); return /^https?:$/.test(x.prot
 function link(u, text, attrs) { const s = safeUrl(u); return s ? el("a", {href: s, rel: "noopener nofollow", target: "_blank", ...attrs}, text) : el("span", {}, text); }
 function unknown(t) { return el("span", {class: "unknown"}, t || "unknown"); }
 /* format:begin */
-/* CHG-2026-057: display-only number format. Comma thousands, point decimal. Money and
-   measured amounts use exactly two decimals (1,234,567.89); counts use none (1,234).
-   Rounding is half-up (half away from zero), not banker's rounding. A negative rand
-   amount is written -R1,234.50. Do not use these helpers in CSV/JSON data exports. */
+/* CHG-2026-057: display-only number format (owner decisions 13 Nov 2026 19:30 SAST and 14 Nov 2026 16:46 SAST).
+   Comma thousands, point decimal. No rounding in the formatter: a value shows the digits the data holds.
+   Money held in cents shows exactly two decimals. `places` only pads with zeros (a documented calculation's
+   precision); it never cuts digits. Tables show full figures (formatRand, formatCount); prose and headline
+   text may use the short form formatRandShort (R1.2 m). A negative rand amount is -R1,234.50; zero is never
+   signed. Same rules as thusa/format.py. Do not use these helpers in CSV/JSON data exports. */
 const NUM_LOCALE = "en-US";
 function _absPlain(n) {
   const a = Math.abs(n);
@@ -152,84 +154,73 @@ function _absPlain(n) {
   if (pos >= d.length) return d + "0".repeat(pos - d.length);
   return d.slice(0, pos) + "." + d.slice(pos);
 }
-function _roundHalfUpParts(value, places) {
-  if (value == null || value === "") return null;
+function _parts(value) {
+  if (value == null || value === "" || typeof value === "boolean") return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  const sign = n < 0 ? -1 : 1;
-  const s = _absPlain(n);
-  const dot = s.indexOf(".");
-  let intp = dot < 0 ? s : s.slice(0, dot), frac = dot < 0 ? "" : s.slice(dot + 1);
-  intp = intp.replace(/^0+(?=\d)/, "") || "0";
-  if (frac.length < places) frac = frac.padEnd(places, "0");
-  let digits = intp + frac.slice(0, places);
-  const next = frac.slice(places);
-  if (next.length && next[0] >= "5") {
-    const arr = digits.split("");
-    for (let i = arr.length - 1; i >= 0; i--) {
-      if (arr[i] < "9") { arr[i] = String(Number(arr[i]) + 1); break; }
-      arr[i] = "0";
-      if (i === 0) arr.unshift("1");
-    }
-    digits = arr.join("");
-  }
-  if (places === 0) return {sign: sign, intp: digits.replace(/^0+(?=\d)/, "") || "0", frac: ""};
-  const cut = digits.length - places;
-  const outInt = cut <= 0 ? "0" : digits.slice(0, cut);
-  const outFrac = cut <= 0 ? digits.padStart(places, "0") : digits.slice(cut);
-  return {sign: sign, intp: outInt.replace(/^0+(?=\d)/, "") || "0", frac: outFrac};
+  const s = _absPlain(n), dot = s.indexOf(".");
+  return {neg: n < 0, intp: (dot < 0 ? s : s.slice(0, dot)).replace(/^0+/, "") || "0", frac: dot < 0 ? "" : s.slice(dot + 1)};
+}
+function _shift(p, k) {
+  let digits = p.intp + p.frac, point = p.intp.length + k;
+  if (point <= 0) { digits = "0".repeat(1 - point) + digits; point = 1; }
+  if (point > digits.length) digits += "0".repeat(point - digits.length);
+  return {neg: p.neg, intp: digits.slice(0, point).replace(/^0+/, "") || "0", frac: digits.slice(point)};
 }
 function _group(intp) { return intp.replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
-function _roundHalfUp(value, places) {
-  const p = _roundHalfUpParts(value, places);
-  return p == null ? null : p.sign * Number(p.intp + (p.frac ? "." + p.frac : ""));
+function _render(p, places = 0) {
+  const frac = p.frac.length < places ? p.frac.padEnd(places, "0") : p.frac;
+  const neg = p.neg && /[1-9]/.test(p.intp + frac);
+  return (neg ? "-" : "") + _group(p.intp) + (frac ? "." + frac : "");
 }
-function formatAmount(value) {
-  const p = _roundHalfUpParts(value, 2);
-  if (p == null) return "";
-  if (p.intp === "0" && /^0+$/.test(p.frac)) return "0.00";  // not -0.00
-  return (p.sign < 0 ? "-" : "") + _group(p.intp) + "." + p.frac;
-}
-function formatCount(value) {
-  const p = _roundHalfUpParts(value, 0);
-  if (p == null) return "";
-  if (p.intp === "0") return "0";
-  return (p.sign < 0 ? "-" : "") + _group(p.intp);
-}
+function formatAmount(value, places = 0) { const p = _parts(value); return p ? _render(p, places) : ""; }
+function formatCount(value) { return formatAmount(value); }
+function _randParts(cents) { const p = _parts(cents); return p ? _shift(p, -2) : null; }
 function formatRand(cents) {
-  if (cents == null || cents === "") return "unknown";
-  const n = Number(cents);
-  if (!Number.isFinite(n)) return "unknown";
-  const body = formatAmount(Math.abs(n) / 100);
-  if (!body) return "unknown";
-  if (body === "0.00") return "R0.00";
-  return (n < 0 ? "-R" : "R") + body;
+  const q = _randParts(cents);
+  if (!q) return "unknown";
+  const body = _render({neg: false, intp: q.intp, frac: q.frac}, 2);
+  return (q.neg && /[1-9]/.test(body) ? "-R" : "R") + body;
 }
-function formatPct(fraction) {
-  if (fraction == null || fraction === "") return null;
-  const n = Number(fraction);
-  if (!Number.isFinite(n)) return null;
-  const body = formatAmount(n * 100);
-  return body ? body + "%" : null;
+function _roundAway(intp, frac, places) {
+  /* Only for the short form: the dropped digits are rounded half away from zero (the page's toLocaleString rule before CHG-2026-057). */
+  let digits = intp + frac.padEnd(places, "0").slice(0, places);
+  if ((frac[places] || "0") >= "5") {
+    const a = digits.split("");
+    for (let i = a.length - 1; i >= 0; i--) { if (a[i] < "9") { a[i] = String(+a[i] + 1); break; } a[i] = "0"; if (i === 0) a.unshift("1"); }
+    digits = a.join("");
+  }
+  const cut = digits.length - places;
+  return {intp: digits.slice(0, cut).replace(/^0+/, "") || "0", frac: digits.slice(cut).replace(/0+$/, "")};
 }
-function formatPctParts(c, a) {
-  c = Number(c); a = Number(a);
-  if (!Number.isFinite(c) || !Number.isFinite(a) || a === 0) return "";
-  return formatAmount(Math.floor((20000 * c + a) / (2 * a)) / 100);
+function formatRandShort(cents) {
+  const q = _randParts(cents);
+  if (!q) return "unknown";
+  for (const [exp, places, suffix] of [[9, 2, " bn"], [6, 1, " m"]]) {
+    if (q.intp.length > exp) {
+      const r = _roundAway(q.intp.slice(0, q.intp.length - exp), q.intp.slice(q.intp.length - exp) + q.frac, places);
+      return (q.neg ? "-R" : "R") + _group(r.intp) + (r.frac ? "." + r.frac : "") + suffix;
+    }
+  }
+  return formatRand(cents);
 }
-function pctPoints(value) {
-  /* A value already in percentage points (75.7) as 75.70%. For a fraction, use formatPct. */
-  if (value == null || value === "") return null;
-  const body = formatAmount(value);
-  return body ? body + "%" : null;
-}
+function formatPct(fraction) { const p = _parts(fraction); return p ? _render(_shift(p, 2)) + "%" : null; }
+function pctPoints(value, places = 0) { const body = formatAmount(value, places); return body ? body + "%" : null; }
 /* format:end */
 function intg(v) { return v == null ? "" : formatCount(v); }
 function randFull(c) { return c == null ? "" : formatRand(c); }
-function randText(c) { return c == null ? "" : formatRand(c); }
+function randText(c) { return c == null ? "" : formatRandShort(c); }
+/* Prose and cards: short form, full figure in the hover title. Tables: randCell, full figure. */
 function rand(c) { return c == null ? unknown() : el("span", {title: randFull(c)}, randText(c)); }
+function randCell(c) { return c == null ? unknown() : randFull(c); }
 function num(v) { return v == null ? "" : formatAmount(v); }
+function centsAmount(c) { const q = c == null ? null : _randParts(c); return q ? _render(q, 2) : ""; }
 function pct(x) { return x == null ? null : formatPct(x); }
+/* A computed ratio (not stored data) shown to one decimal of a percent: the page's documented rule
+   before CHG-2026-057 (pct default of one decimal). The calculation rounds; the formatter does not. */
+function ratioPct(x) { return x == null || !Number.isFinite(x) ? null : pctPoints(Math.round(x * 1000) / 10 + 0); }
+/* A computed rand amount to the cent (the money precision). */
+function toCent(v) { return Math.round(v * 100) / 100 + 0; }
 function fyLabel(fye) { fye = +fye; return `${fye - 1}/${String(fye).slice(-2)}`; }
 function natFy(fy) { fy = +fy; return `${fy}/${String(fy + 1).slice(-2)}`; }
 function dateSast(iso) { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString("en-ZA", {timeZone: "Africa/Johannesburg", dateStyle: "medium", timeStyle: "short"}) + " SAST"; }
@@ -327,7 +318,7 @@ async function vHome() {
   setView("Where does South Africa's public money go?",
     el("p", {class: "lead"}, "Budgets, spending, audit results and tenders for every municipality and national department - from official open data, with what is missing shown as clearly as what is there."),
     el("div", {class: "grid"},
-      kp(c.complete_pct == null ? "unknown" : pctPoints(c.complete_pct), `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
+      kp(c.complete_pct == null ? "unknown" : pctPoints(c.complete_pct, 1), `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
       gap,
       kp(intg(ctr.municipalities), "municipalities and districts"),
       kp(intg(ctr.departments), "national departments with budget data"),
@@ -375,7 +366,7 @@ async function vCoverage(params) {
   const summary = table("Share of applicable municipality-years with each data type present (years whose audits are due)", [
     {label: "Data type", value: r => DT[r[0]] || r[0]},
     {label: "Present", num: 1, value: r => r[1].present}, {label: "Partial", num: 1, value: r => r[1].partial}, {label: "Missing", num: 1, value: r => r[1].missing},
-    {label: "Present %", num: 1, render: r => r[1].present_pct == null ? null : pctPoints(r[1].present_pct), value: r => r[1].present_pct}], Object.entries(h), "coverage-by-type.csv");
+    {label: "Present %", num: 1, render: r => r[1].present_pct == null ? null : pctPoints(r[1].present_pct, 1), value: r => r[1].present_pct}], Object.entries(h), "coverage-by-type.csv");
   function draw() {
     const i = cov.data_types.indexOf(st.dt), q = st.q.toLowerCase();
     const ents = cov.entities.map(e => ({e, m: byId[e.id]})).filter(({m}) => m && (!st.p || m.province === st.p) && (!st.t || m.type === st.t) && (!q || (m.name + " " + m.code).toLowerCase().includes(q)))
@@ -394,7 +385,7 @@ async function vCoverage(params) {
   setView("Data coverage", el("p", {class: "lead"}, "Which official data exists for each municipality and financial year (July–June). Missing data is a finding in itself: it is shown, never hidden or filled in."),
     el("div", {class: "legend"}, Object.entries(STATE).filter(([k]) => k !== "?").map(([k, v]) => el("span", {}, el("i", {class: "s-" + k}), `${SYM[k]} ${v}`))),
     filters, body, el("h2", {}, "Summary"), summary,
-    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct == null ? "unknown" : pctPoints(cov.headline.complete_pct)} of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
+    el("p", {class: "small muted"}, `Headline: ${cov.headline.complete_pct == null ? "unknown" : pctPoints(cov.headline.complete_pct, 1)} of municipality-years from ${fyLabel(cov.headline.fye_min)} to ${fyLabel(cov.headline.fye_max)} have every core data type (budget, audited actuals, irregular & wasteful spending, audit opinion).`),
     gapBox(coreGapLines(cov), {link: 1, extra: projectionLines(cov)}));
   draw();
 }
@@ -413,7 +404,7 @@ async function vMunicipalities(params) {
       {label: "Municipality", render: m => el("a", {href: "#/m/" + encodeURIComponent(m.id)}, m.name), value: m => m.name},
       {label: "Province", value: m => prov(m.province)}, {label: "Type", value: m => TYPES[m.type] || m.type},
       {label: "Latest audited year", value: m => ly(m) ? fyLabel(ly(m)) : null},
-      {label: "Audited spending", num: 1, render: m => ly(m) ? rand(m.years[ly(m)].audited.exp) : unknown(), csvValue: m => ly(m) ? m.years[ly(m)].audited.exp / 100 : null, csv: "audited_spending_rand"},
+      {label: "Audited spending", num: 1, render: m => ly(m) ? randCell(m.years[ly(m)].audited.exp) : unknown(), csvValue: m => ly(m) ? m.years[ly(m)].audited.exp / 100 : null, csv: "audited_spending_rand"},
       {label: "Latest audit opinion", render: m => { const y = latestYear(m, "audit"); return y ? [opinionChip(m.years[y].audit.code, mun.audit_opinions), " ", fyLabel(y)] : unknown(); },
        value: m => { const y = latestYear(m, "audit"); return y ? `${mun.audit_opinions[m.years[y].audit.code]} (${fyLabel(y)})` : null; }}],
       rows, "municipalities.csv", {limit: 400}));
@@ -447,7 +438,7 @@ async function vMunicipality(id) {
     el("p", {class: "lead"}, `${TYPES[m.type] || m.type} · ${prov(m.province)} · code ${m.code}${m.category ? " · category " + m.category : ""}. `, link(m.profile, "Municipal Money profile")),
     el("div", {class: "grid"},
       el("div", {class: "card kpi"}, el("b", {}, lyd ? rand(lyd.audited.exp) : unknown()), el("span", {}, ly ? `audited spending ${fyLabel(ly)} · ` : "audited spending · ", lyd ? srcLink(mun, lyd.audited.src) : "")),
-      el("div", {class: "card kpi"}, el("b", {}, variance == null ? unknown() : (variance >= 0 ? "+" : "") + pct(variance)), el("span", {}, `audited spending vs the ${m.years[ly] && m.years[ly].adjusted ? "adjusted" : "original"} budget${ly ? ", " + fyLabel(ly) : ""}`)),
+      el("div", {class: "card kpi"}, el("b", {}, variance == null ? unknown() : (variance >= 0 ? "+" : "") + ratioPct(variance)), el("span", {}, `audited spending vs the ${m.years[ly] && m.years[ly].adjusted ? "adjusted" : "original"} budget${ly ? ", " + fyLabel(ly) : ""}`)),
       el("div", {class: "card kpi"}, el("b", {}, uifwRows.length ? rand(uifwRows[uifwRows.length - 1].d.uifw.irregular) : unknown()), el("span", {}, uifwRows.length ? `irregular expenditure reported for ${fyLabel(uifwRows[uifwRows.length - 1].y)}` : "irregular expenditure")),
       el("div", {class: "card kpi"}, el("b", {}, audits.length ? opinionChip(audits[audits.length - 1].d.audit.code, mun.audit_opinions) : unknown()), el("span", {}, audits.length ? `audit opinion ${fyLabel(audits[audits.length - 1].y)}` : "audit opinion")),
       el("div", {class: "card kpi"}, el("b", {}, unknown()), el("span", {title: man.population.reason}, "spending per resident: population data not loaded yet (", el("a", {href: "#/sources"}, "why"), ")"))),
@@ -459,8 +450,8 @@ async function vMunicipality(id) {
     table("Budget vs actual (operating revenue and expenditure)", [
       {label: "Year", value: r => fyLabel(r.y)},
       ...[["budget", "Original budget"], ["adjusted", "Adjusted budget"], ["audited", "Audited actual"]].flatMap(([k, lb]) => [
-        {label: lb + " spending", num: 1, render: r => r.d[k] ? rand(r.d[k].exp) : unknown(), csvValue: r => r.d[k] && r.d[k].exp != null ? r.d[k].exp / 100 : null, csv: k + "_expenditure_rand"},
-        {label: lb + " revenue", num: 1, render: r => r.d[k] ? rand(r.d[k].rev) : unknown(), csvValue: r => r.d[k] && r.d[k].rev != null ? r.d[k].rev / 100 : null, csv: k + "_revenue_rand"}]),
+        {label: lb + " spending", num: 1, render: r => r.d[k] ? randCell(r.d[k].exp) : unknown(), csvValue: r => r.d[k] && r.d[k].exp != null ? r.d[k].exp / 100 : null, csv: k + "_expenditure_rand"},
+        {label: lb + " revenue", num: 1, render: r => r.d[k] ? randCell(r.d[k].rev) : unknown(), csvValue: r => r.d[k] && r.d[k].rev != null ? r.d[k].rev / 100 : null, csv: k + "_revenue_rand"}]),
       {label: "Source", render: r => { const s = (r.d.audited || r.d.adjusted || r.d.budget); return s ? srcLink(mun, s.src) : unknown("none"); }, csvValue: r => { const s = (r.d.audited || r.d.adjusted || r.d.budget); return s ? srcUrl(mun, s.src) : ""; }, csv: "source_url"}],
       rows.filter(r => r.d.budget || r.d.adjusted || r.d.audited), `${m.code}-budget-vs-actual.csv`),
     el("h2", {}, "Irregular, fruitless & wasteful and unauthorised expenditure"),
@@ -472,7 +463,7 @@ async function vMunicipality(id) {
     table("Reported UIF&W expenditure", [
       {label: "Year", value: r => fyLabel(r.y)},
       ...[["irregular", "Irregular"], ["fruitless_wasteful", "Fruitless & wasteful"], ["unauthorised", "Unauthorised"]].map(([k, lb]) => (
-        {label: lb, num: 1, render: r => rand(r.d.uifw[k] ?? null), csvValue: r => r.d.uifw[k] == null ? null : r.d.uifw[k] / 100, csv: k + "_rand"})),
+        {label: lb, num: 1, render: r => randCell(r.d.uifw[k] ?? null), csvValue: r => r.d.uifw[k] == null ? null : r.d.uifw[k] / 100, csv: k + "_rand"})),
       {label: "Source", render: r => srcLink(mun, r.d.uifw.src), csvValue: r => srcUrl(mun, r.d.uifw.src), csv: "source_url"}], uifwRows, `${m.code}-uifw.csv`),
     el("h2", {}, "Audit opinions"),
     el("p", {class: "small muted"}, "From the Auditor-General. Best to worst: unqualified with no findings ('clean'), unqualified with findings, qualified, adverse, disclaimer. 'Outstanding' means the audit was not finished."),
@@ -484,7 +475,7 @@ async function vMunicipality(id) {
     el("h2", {}, "Tenders"),
     buyers.length ? [
       table("Published tender awards by year (eTenders)", [
-        {label: "Year", value: r => r[0]}, {label: "Awards", num: 1, value: r => r[1].awards}, {label: "Known value", num: 1, render: r => rand(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
+        {label: "Year", value: r => r[0]}, {label: "Awards", num: 1, value: r => r[1].awards}, {label: "Known value", num: 1, render: r => randCell(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
         {label: "No value published", num: 1, value: r => pct(r[1].missing_share)}, {label: "Largest supplier's share", num: 1, value: r => pct(r[1].top_supplier_share)}],
         buyers.flatMap(b => Object.entries(b.years).filter(([k]) => k !== "all")), `${m.code}-tenders.csv`),
       el("p", {class: "small muted"}, "Supplier concentration is shown without names. Values: only plausible published values are summed; awards without a value are counted, never treated as R0."),
@@ -503,7 +494,7 @@ async function showAwards(box, buyerIds, name) {
   rows.sort((a, b) => (b.r[2] || "").localeCompare(a.r[2] || ""));
   box.replaceChildren(table("Award records as published on eTenders (public records, not findings)", [
     {label: "Date", value: x => x.r[2]}, {label: "Buyer", value: x => bname[x.r[4]]}, {label: "Supplier", value: x => x.r[5]},
-    {label: "Value", num: 1, render: x => x.r[6] == null ? unknown(x.r[7] ? x.r[7].replace(/_/g, " ") : "unknown") : rand(x.r[6]), csvValue: x => x.r[6] == null ? null : x.r[6] / 100, csv: "value_rand"},
+    {label: "Value", num: 1, render: x => x.r[6] == null ? unknown(x.r[7] ? x.r[7].replace(/_/g, " ") : "unknown") : randCell(x.r[6]), csvValue: x => x.r[6] == null ? null : x.r[6] / 100, csv: "value_rand"},
     {label: "Reference", value: x => x.r[8]}, {label: "Method", value: x => x.r[9]},
     {label: "Document", render: x => { const d = awardDoc(x.f, x.r[11]); return d ? link(d, "tender document") : unknown("none"); }, value: x => awardDoc(x.f, x.r[11]) || ""},
     {label: "Source", render: x => srcLink(x.f, x.r[12]), csvValue: x => srcUrl(x.f, x.r[12]), csv: "source_url"}], rows.map(x => x), `${name}-awards.csv`, {limit: 200}));
@@ -517,7 +508,7 @@ async function vDepartments() {
     table("National departments: latest main budget", [
       {label: "Department", render: x => el("a", {href: "#/d/" + encodeURIComponent(x.d.id)}, x.d.name), value: x => x.d.name}, {label: "Vote", value: x => x.d.vote},
       {label: "Year", value: x => natFy(x.fy)},
-      {label: "Main budget", num: 1, render: x => x.d.years[x.fy].main ? rand(x.d.years[x.fy].main.amount) : unknown(), csvValue: x => x.d.years[x.fy].main && x.d.years[x.fy].main.amount != null ? x.d.years[x.fy].main.amount / 100 : null, csv: "main_budget_rand"},
+      {label: "Main budget", num: 1, render: x => x.d.years[x.fy].main ? randCell(x.d.years[x.fy].main.amount) : unknown(), csvValue: x => x.d.years[x.fy].main && x.d.years[x.fy].main.amount != null ? x.d.years[x.fy].main.amount / 100 : null, csv: "main_budget_rand"},
       {label: "Source", render: x => { const p = x.d.years[x.fy].main || Object.values(x.d.years[x.fy]).find(v => v && v.src); return p ? srcLink(dep, p.src) : unknown(); }, csvValue: x => { const p = x.d.years[x.fy].main || Object.values(x.d.years[x.fy]).find(v => v && v.src); return p ? srcUrl(dep, p.src) : ""; }, csv: "source_url"}],
       rows, "national-departments.csv"));
 }
@@ -530,8 +521,8 @@ async function vDepartment(id) {
   setView(d.name, el("p", {class: "lead"}, `National department, vote ${d.vote}.`),
     chart(`Budget and spending, ${d.name}`, fys.map(natFy), ph.map(([k, n, c]) => ({name: n, color: c, values: fys.map(fy => am(fy, k))}))),
     table("Budget phases per financial year", [{label: "Year", value: fy => natFy(fy)},
-      ...ph.map(([k, n]) => ({label: n, num: 1, render: fy => rand(am(fy, k)), csvValue: fy => am(fy, k) == null ? null : am(fy, k) / 100, csv: k + "_rand"})),
-      {label: "Spent vs final", num: 1, value: fy => am(fy, "audited") != null && am(fy, "final") ? pct((am(fy, "audited") - am(fy, "final")) / am(fy, "final")) : null},
+      ...ph.map(([k, n]) => ({label: n, num: 1, render: fy => randCell(am(fy, k)), csvValue: fy => am(fy, k) == null ? null : am(fy, k) / 100, csv: k + "_rand"})),
+      {label: "Spent vs final", num: 1, value: fy => am(fy, "audited") != null && am(fy, "final") ? ratioPct((am(fy, "audited") - am(fy, "final")) / am(fy, "final")) : null},
       {label: "Lines without a value", num: 1, value: fy => Object.values(d.years[fy]).reduce((s, v) => s + (v && v.unknown_lines || 0), 0)},
       {label: "Source", render: fy => { const p = Object.values(d.years[fy]).find(v => v && v.src); return p ? srcLink(dep, p.src) : unknown(); }, csvValue: fy => { const p = Object.values(d.years[fy]).find(v => v && v.src); return p ? srcUrl(dep, p.src) : ""; }, csv: "source_url"}],
       fys, `${d.id.replace(/[^a-z0-9-]/gi, "")}-budget.csv`),
@@ -549,14 +540,14 @@ async function vTenders(params) {
       .sort((a, b) => st.sort === "missing" ? b.years.all.missing_share - a.years.all.missing_share : st.sort === "value" ? (b.years.all.known_value || 0) - (a.years.all.known_value || 0) : b.years.all.awards - a.years.all.awards);
     out.replaceChildren(table("Buyers (all years)", [
       {label: "Buyer", render: b => b.gov_body_id ? el("a", {href: "#/m/" + encodeURIComponent(b.gov_body_id)}, b.name) : b.name, value: b => b.name},
-      {label: "Awards", num: 1, value: b => b.years.all.awards}, {label: "Known value", num: 1, render: b => rand(b.years.all.known_value), csvValue: b => b.years.all.known_value == null ? null : b.years.all.known_value / 100, csv: "known_value_rand"},
+      {label: "Awards", num: 1, value: b => b.years.all.awards}, {label: "Known value", num: 1, render: b => randCell(b.years.all.known_value), csvValue: b => b.years.all.known_value == null ? null : b.years.all.known_value / 100, csv: "known_value_rand"},
       {label: "No value published", num: 1, value: b => pct(b.years.all.missing_share)}, {label: "Largest supplier's share", num: 1, value: b => pct(b.years.all.top_supplier_share)},
       {label: "Records", render: b => el("button", {class: "btn-csv", onclick: async e => { e.target.disabled = true; await showAwards(awardsBox, new Set([b.id]), (b.name || "buyer").replace(/[^a-z0-9]+/gi, "-")); awardsBox.scrollIntoView({behavior: "smooth"}); e.target.disabled = false; }}, "show"), value: () => ""}],
       rows, "tender-buyers.csv", {limit: 150}));
   }
   setView("Tenders", el("p", {class: "lead"}, "Tender awards published by government buyers on National Treasury's eTenders portal. These are public records as published - not flags or findings. Award values can be multi-year, framework or estimated contract values, so a year's total is not that year's spending."),
     table("All buyers, by year", [{label: "Year", value: r => r[0]}, {label: "Awards", num: 1, value: r => r[1].awards},
-      {label: "Known value", num: 1, render: r => rand(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
+      {label: "Known value", num: 1, render: r => randCell(r[1].known_value), csvValue: r => r[1].known_value == null ? null : r[1].known_value / 100, csv: "known_value_rand"},
       {label: "No value published", num: 1, value: r => pct(r[1].missing_share)}, {label: "Implausible values", num: 1, value: r => r[1].implausible_value}], nat, "tenders-by-year.csv"),
     el("p", {class: "small muted"}, ts.about.join(" ")),
     el("h2", {}, "Buyers"),
@@ -596,8 +587,8 @@ async function vTools(sub, params) {
     const a = parseFloat(amt.value), f = idx[from.value], t = idx[to.value];
     if (!(a >= 0) || !f || !t) { infOut.replaceChildren(unknown("enter an amount and two months")); return; }
     const res = a * t[1] / f[1];
-    infOut.replaceChildren(el("p", {}, `R${formatAmount(a)} in ${from.selectedOptions[0].text} is worth about `, el("b", {}, "R" + formatAmount(res)), ` in ${to.selectedOptions[0].text} prices.`),
-      el("p", {class: "small muted"}, `CPI ${from.value}: ${num(f[1])} → ${to.value}: ${num(t[1])} (${cpi.base}). Change: ${pct(t[1] / f[1] - 1)}. `, srcLink(pr, t[2], "CPI source")));
+    infOut.replaceChildren(el("p", {}, `R${formatAmount(a, 2)} in ${from.selectedOptions[0].text} is worth about `, el("b", {}, "R" + formatAmount(toCent(res), 2)), ` in ${to.selectedOptions[0].text} prices.`),
+      el("p", {class: "small muted"}, `CPI ${from.value}: ${num(f[1])} → ${to.value}: ${num(t[1])} (${cpi.base}). Change: ${ratioPct(t[1] / f[1] - 1)}. `, srcLink(pr, t[2], "CPI source")));
   }
   [amt, from, to].forEach(x => x.addEventListener("input", calc));
   /* fuel */
@@ -613,9 +604,9 @@ async function vTools(sub, params) {
     const row = fuel.rows.find(r => r[0] === y && r[1] === mo && r[2] === fgrade.value);
     if (!row) return fuelOut.replaceChildren(el("p", {}, unknown(`No official price loaded for ${MONTHS[mo - 1]} ${y}.`)), el("p", {class: "small muted"}, `Loaded months: ${fuel.rows.length ? fuel.rows[0][0] + "-" + String(fuel.rows[0][1]).padStart(2, "0") : "none"} to ${fuel.last_period || "none"} (KE-012).`));
     const off = row[3] / 100, paid = parseFloat(fpaid.value), regulated = fgrade.value.startsWith("petrol");
-    const kids = [el("p", {}, `Official ${fuel.grades.find(g => g.id === fgrade.value).label} price for ${MONTHS[mo - 1]} ${y}: `, el("b", {}, `R${num(off)}/litre`), ". ", srcLink(pr, row[4], "DMPR source"))];
+    const kids = [el("p", {}, `Official ${fuel.grades.find(g => g.id === fgrade.value).label} price for ${MONTHS[mo - 1]} ${y}: `, el("b", {}, `R${centsAmount(row[3])}/litre`), ". ", srcLink(pr, row[4], "DMPR source"))];
     if (paid > 0) { const diff = paid - off;
-      kids.push(el("p", {}, Math.abs(diff) < 0.005 ? "What you paid matches the official price." : `What you paid is R${num(Math.abs(diff))}/l (${pct(Math.abs(diff) / off)}) ${diff > 0 ? "above" : "below"} the official price.`)); }
+      kids.push(el("p", {}, Math.abs(diff) < 0.005 ? "What you paid matches the official price." : `What you paid is R${formatAmount(toCent(Math.abs(diff)), 2)}/l (${ratioPct(Math.abs(diff) / off)}) ${diff > 0 ? "above" : "below"} the official price.`)); }
     kids.push(el("p", {class: "small muted"}, note, " ", regulated ? "Petrol pump prices are regulated: inland refers to Gauteng, coast to the coastal zones; other inland towns add a small transport cost." : "Diesel and paraffin are not regulated at the pump, so retailers may charge more than this official figure."));
     fuelOut.replaceChildren(...kids);
   }
@@ -638,7 +629,7 @@ async function vTools(sub, params) {
         el("ul", {class: "small"}, fuelKnown.map(k => el("li", {}, el("b", {}, k.id), " ", k.symptom))),
         el("p", {class: "small muted"}, "From our known-error database. ", el("a", {href: "#/sources"}, "All known errors"), "."))] : []),
       el("details", {}, el("summary", {}, "All loaded official prices"), table("Official fuel prices (R/litre)", [{label: "Month", value: r => `${r[0]}-${String(r[1]).padStart(2, "0")}`},
-        {label: "Fuel", value: r => (fuel.grades.find(g => g.id === r[2]) || {}).label}, {label: "R/litre", num: 1, value: r => num(r[3] / 100), csvValue: r => (r[3] / 100).toFixed(3), csv: "rand_per_litre"},
+        {label: "Fuel", value: r => (fuel.grades.find(g => g.id === r[2]) || {}).label}, {label: "R/litre", num: 1, render: r => centsAmount(r[3]), value: r => r[3] / 100, csvValue: r => (r[3] / 100).toFixed(3), csv: "rand_per_litre"},
         {label: "Source", render: r => srcLink(pr, r[4]), csvValue: r => srcUrl(pr, r[4]), csv: "source_url"}], fuel.rows, "fuel-prices.csv")),
       ...(fuelAbout.length ? [el("details", {id: "fuel-about"}, el("summary", {}, "How to read these prices"), el("ul", {class: "small"}, fuelAbout.map(t => el("li", {}, t))))] : [])),
     el("section", {class: "card", style: "margin-top:.8rem", "aria-labelledby": "t-cmp"}, el("h2", {id: "t-cmp", style: "margin-top:0"}, "Compare two municipalities"),
@@ -667,8 +658,8 @@ async function vCompare(params) {
     const rows = [...metrics.map(([lb, f, s]) => ({lb, va: val(f, da), vb: val(f, db), sa: s(da), sb: s(db), money: true})),
       {lb: "Audit opinion", va: da.audit && mun.audit_opinions[da.audit.code], vb: db.audit && mun.audit_opinions[db.audit.code], sa: da.audit && da.audit.src, sb: db.audit && db.audit.src}];
     out.replaceChildren(table(`${A.name} vs ${B.name}, ${fyLabel(y)}`, [{label: "Measure", value: r => r.lb},
-      {label: A.name, num: 1, render: r => r.va == null ? unknown() : [r.money ? rand(r.va) : r.va, " ", r.sa ? srcLink(mun, r.sa, "↗") : ""], csvValue: r => r.va == null ? null : (r.money ? r.va / 100 : r.va), csv: A.name + (" (rand)")},
-      {label: B.name, num: 1, render: r => r.vb == null ? unknown() : [r.money ? rand(r.vb) : r.vb, " ", r.sb ? srcLink(mun, r.sb, "↗") : ""], csvValue: r => r.vb == null ? null : (r.money ? r.vb / 100 : r.vb), csv: B.name + (" (rand)")},
+      {label: A.name, num: 1, render: r => r.va == null ? unknown() : [r.money ? randCell(r.va) : r.va, " ", r.sa ? srcLink(mun, r.sa, "↗") : ""], csvValue: r => r.va == null ? null : (r.money ? r.va / 100 : r.va), csv: A.name + (" (rand)")},
+      {label: B.name, num: 1, render: r => r.vb == null ? unknown() : [r.money ? randCell(r.vb) : r.vb, " ", r.sb ? srcLink(mun, r.sb, "↗") : ""], csvValue: r => r.vb == null ? null : (r.money ? r.vb / 100 : r.vb), csv: B.name + (" (rand)")},
       {label: "Sources", csvOnly: true, csvValue: r => [srcUrl(mun, r.sa), srcUrl(mun, r.sb)].filter(Boolean).join(" ")}], rows, `compare-${A.code}-${B.code}-${y}.csv`),
       el("p", {class: "small muted"}, "Municipalities differ hugely in size, so compare totals with care. Per-resident figures need population data, which is not loaded yet."));
   }
@@ -718,8 +709,8 @@ function ceilingModel(cov, mun) {
   const SCROLL_HINT = "Swipe or scroll sideways to see all the data types \u2192";   // shown only while the table is wider than its box
   const TENDER_CAPTION = "Tender awards: years before 2021/22 are not counted for most municipalities, so N is about four years per municipality, not six. Most counted municipality-years have no award records loaded, and some awards have no value.";
   const h = cov.headline, yIdx = cov.years.map((y, k) => [y, k]).filter(([y]) => y >= h.fye_min && y <= h.fye_max).map(([, k]) => k);
-  const dec = x => x == null || !Number.isFinite(Number(x)) ? "" : (Number(x) < 0 ? "-" : "") + Math.abs(Number(x)).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});   // CHG-2026-057: two decimals, self-contained for the parity test
-  const pct = (a, b) => b ? Math.round(10000 * a / b) / 100 : null;
+  const dec = x => x.toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});   // CHG-2026-047: point decimal, as num() shows (self-contained for the parity test)
+  const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : null;
   const prov = Object.fromEntries(mun.municipalities.map(m => [m.id, m.province]));
   const emptyYears = dt => CEILING_TYPES.includes(dt) ? yIdx.filter(k => !cov.entities.some(e => e.c[dt][k] === "P")) : [];
   const missingPart = k => {
@@ -777,7 +768,7 @@ function headlineContextLines(cov) {
   const CORE = ["budget", "actual_audited", "uifw", "audit_opinion"];
   const h = cov.headline, byYear = Object.fromEntries((h.by_year || []).map(y => [y.fye, y]));
   const join = p => p.length === 1 ? p[0] : p.slice(0, -1).join(", ") + " and " + p[p.length - 1];
-  const tenths = (c, a) => (Math.floor((20000 * c + a) / (2 * a)) / 100).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});   // CHG-2026-057: two decimals, half-up, self-contained
+  const tenths = (c, a) => (Math.floor((2000 * c + a) / (2 * a)) / 10).toLocaleString("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});
   const intg = v => Number(v).toLocaleString("en-US", {maximumFractionDigits: 0});
   const win = [], gaps = [], rest = [];
   cov.years.forEach((fye, k) => {
@@ -824,7 +815,7 @@ async function vUnknowns() {
       }
     }
   }
-  const pct = (a, b) => b ? Math.round(10000 * a / b) / 100 : null;
+  const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : null;
   const rows = Object.values(prov).map(P => {
     const tot = Object.values(P.t).reduce((a, T) => ({P: a.P + T.P, p: a.p + T.p, m: a.m + T.m, n: a.n + T.n}), {P: 0, p: 0, m: 0, n: 0});
     const top = Object.entries(P.reasons).sort((a, b) => b[1] - a[1])[0];
@@ -846,7 +837,7 @@ async function vUnknowns() {
     const m = byId[e.id];
     return {id: e.id, name: m.name, code: m.code, province: m.province, ...c, known: pct(c.P, c.n)};
   }).filter(r => r.n).sort((a, b) => a.known - b.known || b.m - a.m || a.name.localeCompare(b.name));
-  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), pctPoints(v));
+  const meter = v => v == null ? unknown() : el("span", {}, el("span", {class: "bar-meter", style: `width:${Math.max(2, v * 0.6)}px`, "aria-hidden": "true"}), pctPoints(v, 1));
   /* CHG-2026-033: what each by-type column measures, n of N in the cell, the years no municipality has complete data for (descriptive, no cause) */
   const R = ceilingModel(cov, mun), DT_AVAIL = R._text.headers;
   const toTrend = e => { e.preventDefault(); const t = $("#trend"), h = $("header");   // the header is sticky and 73-135 px high: land the heading below it

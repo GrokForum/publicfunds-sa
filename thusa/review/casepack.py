@@ -13,7 +13,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from thusa.format import format_rand
+from thusa.format import format_count, format_rand, is_count_column
 from thusa.review.store import SAST
 
 NATURAL_PERSON = "[natural person, see official record link]"
@@ -116,6 +116,8 @@ def _cell(col: str, v, persons: set[str]) -> str:
         return "unknown" if col.endswith("cents") else ""
     if col.endswith("_cents"):
         return _rand(v)
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and is_count_column(col):
+        return format_count(v)      # table count: 1,234 (CHG-2026-057)
     s = str(v)
     if col in NAME_COL and s in persons:
         return NATURAL_PERSON

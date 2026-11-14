@@ -1,5 +1,6 @@
 """CHG-2026-057 / CHG-2026-047: numbers on a public page use a comma thousands separator and a point decimal
-(1,000,000.00; 75.70%). JSON, CSV and data files keep plain point decimals with no thousands separator."""
+(R1,000,000.00 in a table, R1.2 m in prose; 75.7%). JSON, CSV and data files keep plain point decimals with no
+thousands separator."""
 from __future__ import annotations
 
 import csv
@@ -37,10 +38,13 @@ def test_page_helpers_show_comma_thousands_and_point_decimal():
     # Wrappers sit after the format:begin/end block and call it; include the block so they run in node.
     a, b = PAGE.index("/* format:begin */"), PAGE.index("/* format:end */")
     block = PAGE[a:b + len("/* format:end */")]
-    js = "\n".join([block, _fn("num"), _fn("pct"), _fn("randFull"), _fn("intg"), _fn("randText"),
-                    "console.log(JSON.stringify([num(1000000), randFull(100000000), pct(0.757), intg(1167), intg(1285), num(1234.5), randText(75000000)]))"])
+    js = "\n".join([block, _fn("num"), _fn("pct"), _fn("randFull"), _fn("intg"), _fn("randText"), _fn("centsAmount"), _fn("ratioPct"),
+                    "console.log(JSON.stringify([num(1000000), randFull(100000000), pct(0.757), intg(1167), intg(1285), num(1234.5),"
+                    " randText(75000000), randText(120000000), randText(345000000000), randFull(-123450), centsAmount(2345.6),"
+                    " ratioPct(0.12345), ratioPct(-0.0004)]))"])
     out = json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
-    assert out == ["1,000,000.00", "R1,000,000.00", "75.70%", "1,167", "1,285", "1,234.50", "R750,000.00"]
+    assert out == ["1,000,000", "R1,000,000.00", "75.7%", "1,167", "1,285", "1,234.5",
+                   "R750,000.00", "R1.2 m", "R3.45 bn", "-R1,234.50", "23.456", "12.3%", "0%"]
 
 
 def test_page_has_no_decimal_comma_or_za_number_locale():
@@ -59,15 +63,15 @@ def test_page_text_has_no_space_thousands():
 def test_python_mirror_uses_the_same_format():
     cov = json.loads((DATA / "coverage.json").read_text(encoding="utf-8"))
     first, second = headline_context_lines(cov)[:2]
-    assert "90.82% (1,167 of 1,285 municipality-years)" in first
-    assert "64.87% (1,167 of 1,799 municipality-years)" in second
-    assert dec(1234.56) == "1,234.56" and dec(83.33) == "83.33"
+    assert "90.8% (1,167 of 1,285 municipality-years)" in first
+    assert "64.9% (1,167 of 1,799 municipality-years)" in second
+    assert dec(1234.56) == "1,234.6" and dec(83.33) == "83.3"
 
 
 def test_dashboard_check_number_scan():
     spec = importlib.util.spec_from_file_location("dc", ROOT / "scripts" / "dashboard_check.py")
     dc = importlib.util.module_from_spec(spec); spec.loader.exec_module(dc)   # never skips: Playwright is imported inside main()
-    ok = "R1,000,000.00 | 75.70% | 1,167 of 1,285 | 2019/20 | 1 December 2026"
+    ok = "R1,000,000.00 | R1.2 m | 75.7% | 1,167 of 1,285 | 2019/20 | 1 December 2026"
     assert dc.number_format_problems(ok, []) == []
     bad = dc.number_format_problems("90,8% | R1 000 000,00 | 1\u00a0285", [])
     assert any("90,8" in b for b in bad) and any("1 000 000" in b for b in bad) and sum(b.startswith("space thousands") for b in bad) == 2
@@ -128,7 +132,7 @@ def test_dashboard_has_no_raw_percent_concatenation():
 
 
 def test_dashboard_has_no_stale_pct_precision_argument():
-    """page-level pct() has a fixed two-decimal precision; a literal second argument is stale."""
+    """page-level pct() shows the stored precision; a literal second argument (old rounding) is stale."""
     assert not re.search(r"\bpct\([^)\n]+,\s*\d+\s*\)", PAGE)
 
 
@@ -140,5 +144,39 @@ def test_table_formats_numeric_count_cells():
 
 
 def test_present_pct_uses_shared_formatter():
-    assert "pctPoints(r[1].present_pct)" in PAGE
+    assert "pctPoints(r[1].present_pct, 1)" in PAGE   # stored to one decimal: 81.9%
     assert 'present_pct + "%"' not in PAGE
+
+
+# ---- CHG-2026-057 owner style decisions (14 Nov 2026 16:46 SAST): tables full, prose short, no padding ----
+
+def test_tables_show_full_rand_figures():
+    """A table column with a rand CSV value renders randCell (full figure), never the short rand()."""
+    lines = [l for l in PAGE.splitlines() if "render:" in l and "csvValue" in l and re.search(r'_rand"|\(rand\)|known_value_rand', l)]
+    assert len(lines) >= 10
+    for l in lines:
+        assert not re.search(r"(?<![\w.])rand\(", l), l.strip()[:120]
+        assert "randCell(" in l, l.strip()[:120]
+
+
+def test_prose_rand_uses_short_form_with_full_title():
+    assert 'function randText(c) { return c == null ? "" : formatRandShort(c); }' in PAGE
+    assert 'el("span", {title: randFull(c)}, randText(c))' in PAGE
+    assert "function randCell(c) { return c == null ? unknown() : randFull(c); }" in PAGE
+
+
+def test_coverage_percent_is_not_padded_to_two_decimals():
+    assert "pctPoints(c.complete_pct, 1)" in PAGE and "pctPoints(cov.headline.complete_pct, 1)" in PAGE
+    assert not re.search(r"pctPoints\([^)]*,\s*2\s*\)", PAGE)
+    assert "75.70%" not in PAGE and "81.90%" not in PAGE
+
+
+def test_report_and_review_app_tables_full_prose_short():
+    rep = (ROOT / "thusa" / "report.py").read_text(encoding="utf-8")
+    assert "total known value {{ rand_short(aw.total) }}" in rep
+    assert "<td>{{ rand(r.orgb) }}</td>" in rep and "rand_short(r." not in rep
+    assert "amount(h.complete_pct, 1)" in rep
+    from thusa.report import rand, rand_short
+    assert rand(120000000) == "R1,200,000.00" and rand_short(120000000) == "R1.2 m"
+    from thusa.review.warehouse import rand as wrand
+    assert wrand(120000000) == "R1,200,000.00"      # the review-app rand filter is used in table cells

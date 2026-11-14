@@ -168,14 +168,14 @@ def test_page_code_matches_reference(name, mutate):
 @needs_baseline
 def test_reference_behaviour_on_mutations():
     base = model(COV, MUN)
-    assert base["uifw"]["empty"] == ["2024/25"] and base["uifw"]["ceiling"]["EC"] == 83.33
-    assert base["uifw"]["note"].startswith("At most 83.33% with the data PublicFunds loads today (")   # point decimal, as the page shows (CHG-2026-047)
-    assert base["_text"]["in_cell"]["EC"]["uifw"] == "(at most 83.33% with the data loaded today)"
+    assert base["uifw"]["empty"] == ["2024/25"] and base["uifw"]["ceiling"]["EC"] == 83.3
+    assert base["uifw"]["note"].startswith("At most 83.3% with the data PublicFunds loads today (")   # point decimal, as the page shows (CHG-2026-047)
+    assert base["_text"]["in_cell"]["EC"]["uifw"] == "(at most 83.3% with the data loaded today)"
     assert base["procurement"] == {"empty": [], "ceiling": {}, "note": None} and not any(base["_text"]["in_cell"][p]["procurement"] for p in base["_text"]["in_cell"])
     assert not any("tender" in line for line in base["_banner"])       # decision 3: no tender note, marker, banner line or ceiling
     v = model(mutate_reviewer_a_case(COV), MUN)
     assert v["audit_opinion"]["empty"] == ["2022/23", "2024/25"] and v["budget"]["empty"] == ["2022/23", "2024/25"]
-    assert max(v["audit_opinion"]["ceiling"].values()) == 66.67           # descriptive: the page shows the real gap, with no cause
+    assert max(v["audit_opinion"]["ceiling"].values()) == 66.7            # descriptive: the page shows the real gap, with no cause
     assert "no municipality has complete data for 2022/23" in v["audit_opinion"]["note"]
     t = model(mutate_tender_year_emptied(COV), MUN)       # a tender year with no complete cell is NOT reported (not assessed)
     assert t["procurement"] == {"empty": [], "ceiling": {}, "note": None} and t["_banner"] == base["_banner"]
@@ -275,7 +275,7 @@ def test_public_text_has_no_internal_jargon_or_published(mutate):
 def test_the_jargon_check_itself_catches_the_words():
     for bad in ("see KE-006", "not published", "Treasury says", "the uifwexp cube", "eTenders", "Published by AGSA", "components_missing"):
         assert jargon(bad), bad
-    assert not jargon("At most 83.33% with the data PublicFunds loads today (take-up of data)")
+    assert not jargon("At most 83.3% with the data PublicFunds loads today (take-up of data)")
     assert set(HEADERS) == set(COV["data_types"])
 
 
@@ -358,9 +358,9 @@ def test_gap_lines_have_no_jargon_or_published(name, mutate):
 
 
 # ------------------------------------------------------------------ 6. CHG-2026-034 review fixes: context beside the headline, labels, wording
-REAL_CONTEXT = ["Includes 2024/25, for which no municipality has complete data in what PublicFunds has loaded. 2019/20 to 2023/24 alone: 90.82% (1,167 of 1,285 municipality-years).",
+REAL_CONTEXT = ["Includes 2024/25, for which no municipality has complete data in what PublicFunds has loaded. 2019/20 to 2023/24 alone: 90.8% (1,167 of 1,285 municipality-years).",
                 "Projection, not data: from the first data update on or after 1 December 2026, the year 2025/26 counts in the headline. If it then looks "
-                "like 2024/25 does today (no municipality with complete data), the headline would fall to about 64.87% (1,167 of 1,799 municipality-years), because 2025/26 would count as a gap, not because anything got worse, if nothing else changes."]
+                "like 2024/25 does today (no municipality with complete data), the headline would fall to about 64.9% (1,167 of 1,799 municipality-years), because 2025/26 would count as a gap, not because anything got worse, if nothing else changes."]
 
 
 @needs_baseline
@@ -394,7 +394,7 @@ def test_headline_context_edge_cases():
 
 def test_headline_context_rounds_half_up_like_the_page():
     from thusa.coverage_ceiling import _tenths
-    assert [_tenths(c, a) for c, a in ((1167, 1285), (1167, 1799), (1, 8), (1, 16), (2, 3), (0, 5), (5, 5))] == ["90.82", "64.87", "12.50", "6.25", "66.67", "0.00", "100.00"]
+    assert [_tenths(c, a) for c, a in ((1167, 1285), (1167, 1799), (1, 8), (1, 16), (2, 3), (0, 5), (5, 5))] == ["90.8", "64.9", "12.5", "6.3", "66.7", "0.0", "100.0"]
 
 
 @pytest.mark.parametrize("name,mutate", GAP_CASES)
@@ -478,7 +478,7 @@ def test_headline_context_says_municipality_years_with_decimal_commas_and_why_th
     """Each count carries its unit (not 'municipalities'), percentages use a point decimal and counts a comma thousands separator (CHG-2026-047), and the prediction says the fall
     comes from the year counting as a gap, not from anything getting worse, and that it assumes nothing else changes."""
     first, second = headline_context_lines(COV)
-    assert "90.82%" in first and "(1,167 of 1,285 municipality-years)" in first and "90,8" not in first
-    assert "64.87%" in second and "(1,167 of 1,799 municipality-years)" in second and "64,9" not in second
+    assert "90.8%" in first and "(1,167 of 1,285 municipality-years)" in first and "90,8" not in first
+    assert "64.9%" in second and "(1,167 of 1,799 municipality-years)" in second and "64,9" not in second
     assert second.endswith("because 2025/26 would count as a gap, not because anything got worse, if nothing else changes.")
     assert second.startswith("Projection, not data: ")
