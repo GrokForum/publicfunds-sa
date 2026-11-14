@@ -177,6 +177,29 @@ def test_report_and_review_app_tables_full_prose_short():
     assert "<td>{{ rand(r.orgb) }}</td>" in rep and "rand_short(r." not in rep
     assert "amount(h.complete_pct, 1)" in rep
     from thusa.report import rand, rand_short
-    assert rand(120000000) == "R1,200,000.00" and rand_short(120000000) == "R1.2 m"
+    assert rand(120000000) == "R1,200,000.00" and rand_short(120000000) == "R1.2 m (R1,200,000.00)"
     from thusa.review.warehouse import rand as wrand
     assert wrand(120000000) == "R1,200,000.00"      # the review-app rand filter is used in table cells
+
+
+def test_text_report_short_form_carries_full_figure_in_brackets():
+    """Review finding: a text report has no hover title, so every short form carries its full figure."""
+    from thusa.report import rand_short
+    assert rand_short(120000000) == "R1.2 m (R1,200,000.00)"
+    assert rand_short(345000000000) == "R3.45 bn (R3,450,000,000.00)"
+    assert rand_short(-129950000) == "-R1.3 m (-R1,299,500.00)"
+    assert rand_short(123456) == "R1,234.56"            # nothing shortened: no brackets
+    assert rand_short(None) == "unknown"
+    assert rand_short(-0.0) == "R0.00"
+    src = (ROOT / "thusa" / "report.py").read_text(encoding="utf-8")
+    assert src.count("format_rand_short(") == 1         # only through the bracketed helper
+
+
+def test_rendered_text_report_sentence_has_bracketed_full_figure():
+    from jinja2 import Environment
+    from thusa import report
+    tpl = report.MUNI[report.MUNI.index("<h2>eTenders awards"):report.MUNI.index("</p>", report.MUNI.index("<h2>eTenders awards")) + 4]
+    env = Environment(autoescape=True)
+    env.globals.update(rand_short=report.rand_short, count=report.format_count)
+    out = env.from_string(tpl).render(aw={"n": 1167, "valued": 900, "total": 120000000})
+    assert "1,167 award-supplier rows, 900 with a usable value, total known value R1.2 m (R1,200,000.00)." in out

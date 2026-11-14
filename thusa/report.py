@@ -42,8 +42,14 @@ def rand(cents):
 
 
 def rand_short(cents):
-    """Readable short form (R1.2 m), for prose (CHG-2026-057)."""
-    return format_rand_short(cents)
+    """Readable short form for prose, with the full figure in brackets (CHG-2026-057).
+
+    A text report has no hover title, so a short form always carries its full figure:
+    "R1.2 m (R1,200,000.00)". When nothing is shortened (under R1 m, or unknown), the
+    full figure is shown once, with no brackets.
+    """
+    short, full = format_rand_short(cents), format_rand(cents)
+    return short if short == full else f"{short} ({full})"
 
 
 def headline(con) -> dict:

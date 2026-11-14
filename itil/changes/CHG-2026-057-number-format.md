@@ -73,7 +73,7 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). Related choices stay open.
 5. Optional: `format_amount(-0.0)` and any value that rounds to zero show `0.00`, never `-0.00`, with a test. The CHG-2026-056 change-log row, which still said the PR was not merged, now records the merge of PR #5 at 13 Nov 2026 19:16 SAST (merge 8cdf9ad6). That side fix is documentation only.
 
-### Owner style follow-up (this head, replaces the rounding and padding above)
+### Owner style follow-up (head 0893952b, replaces the rounding and padding above)
 
 Implements the owner style decisions of 14 Nov 2026 16:46 SAST:
 
@@ -82,6 +82,10 @@ Implements the owner style decisions of 14 Nov 2026 16:46 SAST:
 3. `thusa/coverage_ceiling.py` and the page's by-type and context-line calculations are back to their documented one-decimal rule (as on main): 90.8%, 64.9%, 83.3%.
 4. Reports: `thusa/report.py` tables keep the full figure; the eTenders summary sentence uses `rand_short`. Report, snapshot and review-app coverage percentages use one decimal (75.7%). Case-pack table counts now use 1,234.
 5. Thresholds in prose (bidding limits, HHI 2,500) keep the full figure.
+
+### Review finding fix (this head)
+
+Both independent reviewers passed head 0893952b with one required fix: in a text report there is no hover title, so a short form must carry its full figure. `thusa/report.py` `rand_short` now writes "R1.2 m (R1,200,000.00)". When nothing is shortened (under R1 m, or unknown) the full figure is shown once, with no brackets. A search of the Python report paths found no other short form: case packs and other Markdown output already use the full figure. The public dashboard is not changed (it shows the full figure in the hover title). Data files are not changed. Tests: `test_text_report_short_form_carries_full_figure_in_brackets` and `test_rendered_text_report_sentence_has_bracketed_full_figure`.
 
 ## Stays the same
 
@@ -103,7 +107,7 @@ Implements the owner style decisions of 14 Nov 2026 16:46 SAST:
 ## Testing (evidence, not claims)
 
 - New tests in `tests/test_format.py`, plus updates to `tests/test_number_format.py`, `tests/test_unknowns_by_type_constant.py`, `tests/test_improvements.py` and `tests/test_case_pack.py`.
-- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** on the first head (86.11 s) and on the documentation follow-up (85.54 s); **888 passed, 1 skipped** on the review follow-up (89.40 s); **905 passed, 1 skipped** (83.82 s) on this owner-style head. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped.
+- Full suite, this checkout: `uv run pytest -q` → **883 passed, 1 skipped** on the first head (86.11 s) and on the documentation follow-up (85.54 s); **888 passed, 1 skipped** on the review follow-up (89.40 s); **905 passed, 1 skipped** (83.82 s) on the owner-style head; **907 passed, 1 skipped** (88.47 s) on this review-fix head. The skip is `tests/test_fuel_xlsx.py` (real November xlsx / history PDF not in `data/`). The previous count on this box, after CHG-2026-056, was 831 passed, 1 skipped.
 - This head's tests: no rounding in the formatter (Python source scan and JS block scan, the short form excepted), source precision and pad-only `places`, signed zero, full rand in tables (every table column with a rand CSV value renders `randCell`), short form in prose, coverage 75.7% and no 75.70% / 81.90% left, stored shares at stored precision, Python/JS parity for all helpers including the short form, report tables full and report prose short, and the count-column rule.
 - `scripts/dashboard_check.py` (headless browser check) was not run on this box: the optional Playwright group is not installed. Its number scan is covered by `tests/test_number_format.py::test_dashboard_check_number_scan`.
 - Before and after text snippets were saved under `/workspace/number-format-samples/` (not in git). This head (`style-before-after.txt`): table R1,200,000.00 (unchanged); prose R1,200,000.00 → R1.2 m and R3,450,000,000.00 → R3.45 bn; coverage 75.70% → 75.7%; Present % 81.90% → 81.9%; share 50.00% → 50%; negative -R1,234.50 (unchanged); headline context 90.82% → 90.8% (as on main). A case pack "R750 000" still becomes "R750,000.00".
