@@ -160,3 +160,14 @@ def format_pct_points(value, places: int = 0) -> str | None:
     """A value already in percentage points: 75.7 → '75.7%'. ``places`` pads only (a calc's precision)."""
     body = format_amount(value, places)
     return f"{body}%" if body else None
+
+
+def format_rand_prose(cents) -> str:
+    """Rand amount in prose that has no hover title (text reports, flag titles and explanations).
+
+    The short form carries its full figure in brackets: "R1.2 m (R1,200,000.00)". Under a
+    million (or unknown) nothing is shortened, so the full figure shows once, with no
+    brackets: "R123,456.78". Owner decisions 14 Nov 2026 (CHG-2026-057, CHG-2026-059).
+    """
+    short, full = format_rand_short(cents), format_rand(cents)
+    return short if short == full else f"{short} ({full})"
