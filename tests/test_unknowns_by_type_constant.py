@@ -432,7 +432,7 @@ def test_reason_label_for_tender_cells_is_plain_and_the_old_one_is_gone():
 
 def test_home_tender_kpi_and_unknowns_lead_in_the_page_source():
     page = PAGE_JS.read_text()
-    assert 'kp(ctr.awards.toLocaleString(NUM_LOCALE), "tender award records")' in page and "published tender award records" not in page
+    assert 'kp(intg(ctr.awards), "tender award records")' in page and "published tender award records" not in page
     lead = re.search(r'class: "lead"\}, `(For each province[^`]*)`', page).group(1)
     assert lead.startswith("For each province, how much of the expected data PublicFunds has for its municipalities, over the financial years ")
     assert lead.endswith("(the years whose audits are due). Lowest first, so the biggest blind spots are at the top.")

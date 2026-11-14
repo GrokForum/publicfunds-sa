@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Audit trail{% endblock %}
 {% block content %}
 <h1>Audit trail</h1>
-<p class="{{ 'ok' if chain.ok else 'err' }}">Hash chain {{ 'intact' if chain.ok else 'BROKEN at decision ' ~ chain.broken_at_decision_id }} · {{ chain.n }} decision(s) · head <code>{{ chain.head[:16] }}…</code></p>
+<p class="{{ 'ok' if chain.ok else 'err' }}">Hash chain {{ 'intact' if chain.ok else 'BROKEN at decision ' ~ chain.broken_at_decision_id }} · {{ chain.n|count }} decision(s) · head <code>{{ chain.head[:16] }}…</code></p>
 <form class="filters" method="get" action="/audit">
   <label>Reviewer <input name="reviewer" value="{{ f.reviewer }}" maxlength="32"></label>
   <label>Flag ID <input name="flag_id" value="{{ f.flag_id }}" maxlength="16"></label>

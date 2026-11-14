@@ -12,7 +12,7 @@
   {% if e.demarcation_code %}<dt>Municipal Money</dt><dd><a href="https://municipalmoney.gov.za/profiles/municipality-{{ e.demarcation_code|urlencode }}/" rel="noopener noreferrer nofollow" target="_blank">profile</a></dd>{% endif %}
 </dl>
 <p class="muted">Money is shown in rand from integer cents. <span class="unknown">unknown</span> means the source has no value; it is never shown as 0. Each <code>source sha256</code> links to the raw file it came from.</p></section>
-<section class="card"><h2>Flags ({{ flags|length }})</h2>
+<section class="card"><h2>Flags ({{ flags|length|count }})</h2>
 {% if flags %}<ul class="plain">{% for x in flags %}<li>{{ sev(x.severity) }} <a href="/flags/{{ x.flag_id }}">{{ x.title }}</a> {{ badge(x) }}</li>{% endfor %}</ul>{% else %}<p class="muted">No flags.</p>{% endif %}</section>
 {% for title, rows in e.sections %}<section class="card"><h2>{{ title }}</h2>{{ table(rows, raw_files) }}</section>{% endfor %}
 {% endblock %}

@@ -13,6 +13,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from thusa.format import format_count, format_rand, is_count_column
 from thusa.review.store import SAST
 
 NATURAL_PERSON = "[natural person, see official record link]"
@@ -26,7 +27,7 @@ ALLOWED_PHONES = {re.sub(r"\D", "", HOTLINE)}
 GLOSSARY = {
     "D1": ("Overspending", "audited spending was well above the approved budget: more than 20% above it for a municipality's operating spending (not counting non-cash items such as depreciation), or any overspending of a national department's final appropriation. Budgets under R10 million are ignored."),
     "D3": ("Restricted supplier", "a tender was awarded to a name on National Treasury's restricted-supplier list while the restriction applied."),
-    "D4": ("One supplier dominates", "over three years, one supplier won more than half of a buyer's tender value, and the buyer's awards were highly concentrated (Herfindahl-Hirschman index above 2 500). Only buyers with at least 10 awards worth R10 million or more in total are checked."),
+    "D4": ("One supplier dominates", "over three years, one supplier won more than half of a buyer's tender value, and the buyer's awards were highly concentrated (Herfindahl-Hirschman index above 2,500). Only buyers with at least 10 awards worth R10 million or more in total are checked."),
     "D5": ("Missing award values", "at least half of a buyer's published awards have no value, R0, or an obviously wrong amount under R100."),
     "D8": ("Rising irregular expenditure", "reported irregular expenditure went up two years in a row and grew by at least 50% on the year before, to at least R10 million."),
     "D13": ("Fuel price too high", "a fuel payment works out at more than 20% above the highest official fuel price published by the Department of Mineral and Petroleum Resources (DMPR) for that fuel type and period."),
@@ -34,13 +35,13 @@ GLOSSARY = {
     "D16": ("Repeat awards", "one buyer gave the same supplier five or more awards with a known value (each to that supplier alone) within a year."),
     "D17": ("Just under the limit", "one buyer gave one supplier two or more awards within a year, each within 10% below the competitive-bidding limit."),
 }
-LIMITS = ("Competitive-bidding limits (glossary): municipalities R750 000 (metros), R300 000 (local), R200 000 (district), "
+LIMITS = ("Competitive-bidding limits (glossary): municipalities R750,000.00 (metros), R300,000.00 (local), R200,000.00 (district), "
           "VAT incl., Municipal SCM Amendment Regulations (Gazette 49863, 14 Dec 2023); national and provincial "
-          "departments R1 000 000 incl. taxes, PFMA SCM Instruction No. 02 of 2021/22.")
+          "departments R1,000,000.00 incl. taxes, PFMA SCM Instruction No. 02 of 2021/22.")
 BASELINE = {
     "D1": "The approved budget (adjusted budget, else original budget; national: final appropriation) on the same basis, from the National Treasury Municipal Finance API / national budget data. Threshold: +20% (municipal operating), any overspend (national).",
     "D3": "The restriction window (period from / to) in National Treasury's Restricted Supplier and Tender Defaulter report: https://ocpo.treasury.gov.za/RestrictedSupplier/RestrictedSuppliersReport.pdf",
-    "D4": "Thresholds: top supplier > 50% of the buyer's known award value and HHI > 2 500 over 3 years (min. 10 awards, R10 million).",
+    "D4": "Thresholds: top supplier > 50% of the buyer's known award value and HHI > 2,500 over 3 years (min. 10 awards, R10 million).",
     "D5": "Threshold: at least half of the buyer's published awards have no value, R0 or under R100.",
     "D8": "The same municipality's irregular expenditure in the two previous years (AFS notes via the Municipal Finance API).",
     "D13": "The highest official DMPR fuel price for that fuel type and period; threshold +20%.",
@@ -103,10 +104,7 @@ def looks_like_natural_person(name: str | None, is_person=None) -> bool:
 
 
 def _rand(cents) -> str:
-    try:
-        return f"R{int(cents) / 100:,.0f}"
-    except (TypeError, ValueError):
-        return "unknown"
+    return format_rand(cents)
 
 
 def _det(detector_id: str) -> str:
@@ -118,6 +116,8 @@ def _cell(col: str, v, persons: set[str]) -> str:
         return "unknown" if col.endswith("cents") else ""
     if col.endswith("_cents"):
         return _rand(v)
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and is_count_column(col):
+        return format_count(v)      # table count: 1,234 (CHG-2026-057)
     s = str(v)
     if col in NAME_COL and s in persons:
         return NATURAL_PERSON

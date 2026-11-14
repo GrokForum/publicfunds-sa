@@ -57,7 +57,7 @@ def test_sample_pack_renders_required_sections():
               "## Comparison baseline", "## Evidence (with source lineage)", "## Official source records",
               "https://ocds-api.etenders.gov.za/api/OCDSReleases/release/ocds-9t57fa-1",
               "## Possible innocent explanations", "## Checklist for the independent checker",
-              "## How to refer", cp.CW_REPORT, "0800 701 701", "ACME CONSTRUCTION", "R4,000,000", "Sample DM"):
+              "## How to refer", cp.CW_REPORT, "0800 701 701", "ACME CONSTRUCTION", "R4,000,000.00", "Sample DM"):
         assert s in text, s
 
 
