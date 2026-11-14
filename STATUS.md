@@ -1,4 +1,22 @@
-# STATUS (as of 2026-10-23)
+# STATUS (as of 2026-11-14)
+
+## Current (14 Nov 2026)
+
+- Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
+- Live data build: B20261114T005655Z, generated 14 Nov 2026 02:57 SAST, `code_commit` `7a792ba`. `scripts/check_live.py` exited 0 at 18:07 SAST on 14 Nov 2026.
+- PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change (see `changes/CAB-DECISION.md`). Owner GO by role and date; exact words are in the private approval record.
+- Merged and live:
+  - CHG-2026-056 (PR #5, fuel history parser accepts a space as a thousands separator): merge `8cdf9ad6`, 13 Nov 2026 19:16 SAST, exact head `5db0c8c1`, tag `snapshot-2026-11-13-1917`. The 14 Nov nightly published the recovered November 2026 fuel row.
+  - CHG-2026-057 (PR #6, standard number display format): merge `1c6ecda9`, 14 Nov 2026 18:05 SAST, exact head `78c30c1d`, tag `snapshot-2026-11-14-1806`. GitHub Pages build `43613702790` succeeded; `check_live` OK. Display-only; live data files remain B20261114T005655Z.
+- INC-2026-004 is closed (14 Nov 2026) after that nightly succeeded. INC-2026-001 and INC-2026-002 remain mitigated (KE-001, KE-002). INC-2026-003 is still recorded as open.
+- Open PRs on GrokForum/publicfunds-sa:
+  - #1–#4 (CHG-2026-052 to CHG-2026-055, docs only) need a rebase onto current `main`, then fresh reviews and an owner GO on each new head.
+  - #7 (CHG-2026-058): this records PR, open, not merged.
+  - CHG-2026-059 (format follow-ups for Q4 and Q5, which the owner answered on 14 Nov 2026 18:12 SAST): work in progress, PR to follow.
+- Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate: 58 pass, 1 warn (`award_buyer_match_rate_info`, 207 unmatched award-buyer rows), 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
+- Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
+
+## History (as of 2026-10-23)
 
 - PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change. Owner's words: [owner GO; exact words in the private approval record] (see changes/CAB-DECISION.md).
 - PROD: CHG-2026-013, the glossary (#/glossary), is live. Merged PR #9 on 2026-10-23 with the owner's GO ([owner GO; exact words in the private approval record]).
