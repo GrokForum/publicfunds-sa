@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Owner go-ahead to prepare the fix PR, 12 Nov 2026 07:28 SAST, as reported to the author (PublicFunds). This is not a merge GO. |
-| Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
+| Status | Implemented / closed. Merged 13 Nov 2026 19:16 SAST as `8cdf9ad6` (PR #5, exact head `5db0c8c1`, tag `snapshot-2026-11-13-1917`). Owner GO, 13 Nov 2026, confirmed 14 Nov 2026, as reported to the author (PublicFunds). Exact words are in the private approval record. The 14 Nov 2026 nightly succeeded (B20261114T005655Z). INC-2026-004 is closed. Recorded by CHG-2026-058. |
 | Type | **Normal** (parser change). After a merge, the next successful nightly will publish the November 2026 fuel row that now crashes the build. |
 | Environment | DEV only (branch `fix/chg-2026-056-fuel-thousands-space` from origin/main). Nothing pushed to main. Public data is not changed in this PR. |
 | CIs affected | `thusa/parsers.py` (`fuel_history_rows`, new `_fuel_history_number`); `tests/test_publish_data.py`; this record; `itil/registers/change-log.md`; INC-2026-004 |
@@ -78,4 +78,6 @@ Diff, new CHG record, incident update, change-log row, and the PR description we
 
 ## Result
 
-DEV: tests and dry build succeeded on this branch. PR open, not merged. No PROD change.
+Implemented / closed. Merged as PR #5 on 13 Nov 2026 19:16 SAST at exact head `5db0c8c1aa46ae39f1fb71cfc616e90beb2c93d1`, merge commit `8cdf9ad6cb9e51bdc1d36a6d391696ce1f5f8123`, tag `snapshot-2026-11-13-1917`. Owner GO, 13 Nov 2026, confirmed 14 Nov 2026, as reported to the author (PublicFunds). Exact words are in the private approval record.
+
+A manual refresh after the merge published build B20261113T172029Z (13 Nov 2026 19:21 SAST). The 14 Nov 2026 nightly then succeeded by itself: build B20261114T005655Z, generated 2026-11-14 02:57 SAST, `code_commit` `7a792ba` (which includes this merge). INC-2026-004 is closed. Recorded by CHG-2026-058.
