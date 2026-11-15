@@ -42,3 +42,6 @@
 
 ## Operator notes (2026-11-06)
 - Draft operator release notes (plain sentences: date, what you will notice, what can break the routine, what to do on failure): `docs/operator/release-notes.md` (CHG-2026-054, open PR). GitHub Releases from `snapshot-*` tags are the backup.
+
+## Queued (2026-11-06)
+- Offsite MariaDB backup on domains.co.za and a local `/wd` copy remain queued (CSI-055, CI-050). The review database needs a POPIA review and encryption before any offsite copy. **Do not build MariaDB yet.** Local state backup on the box continues under CSI-009 / CHG-2026-044.
