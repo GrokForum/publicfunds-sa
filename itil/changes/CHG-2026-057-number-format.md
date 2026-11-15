@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Owner RFC for number display format, 13 Nov 2026 19:17 SAST; scope confirmed later that evening, as reported to the author (PublicFunds). Main open question closed by owner decision, 13 Nov 2026 19:30 SAST. Style choices closed by owner decision, 14 Nov 2026 16:46 SAST. Both are scope/style decisions, not a merge GO. Exact words are in the private approval record. |
-| Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
+| Status | Implemented / closed. Merged 14 Nov 2026 18:05 SAST as `1c6ecda9` (PR #6, exact head `78c30c1d0821f93bfb6b8526c54b62ba9572e5fc`, tag `snapshot-2026-11-14-1806`). Owner GO, 14 Nov 2026 18:05 SAST, as reported to the author (PublicFunds). Exact words are in the private approval record. Post-merge checks are in Result. Q4 and Q5 were answered by the owner on 14 Nov 2026 18:12 SAST, as reported to the author (PublicFunds), and moved to CHG-2026-059 (work in progress, PR to follow). Recorded by CHG-2026-058. |
 | Type | **Normal-medium**. See "Why this type". |
-| Environment | DEV only (branch `feat/chg-2026-057-number-format` from origin/main). Nothing pushed to main. Public data is not changed in this PR. No publish script was run. |
+| Environment | Merged and live. Merged 14 Nov 2026 18:05 SAST as `1c6ecda9` (PR #6, exact head `78c30c1d`, tag `snapshot-2026-11-14-1806`). GitHub Pages build `43613702790` succeeded for that commit. `scripts/check_live.py` exited 0 at 18:07 SAST on 14 Nov 2026. The format change is display-only; live data remains build B20261114T005655Z. |
 | CIs affected | New `thusa/format.py`; `apps/public-dashboard/index.html`; `thusa/review/casepack.py`; `thusa/review/warehouse.py`; `thusa/review/app.py`; review-app templates; `thusa/report.py`; `thusa/publish.py`; `scripts/dashboard_check.py` (comment only); tests listed below; this record; `itil/registers/change-log.md` |
 | Linked records | CHG-2026-047 (public-page comma thousands and point decimal; this change extends that rule to reports and the review app), old-repo work that was waiting on the comma-versus-point decimal question |
 | Rollback | Close the PR unmerged. If ever merged: `git revert -m 1 <merge commit>`. Git history is the rollback; no .bkp files. |
@@ -53,6 +53,8 @@ These are explicit questions, not open defects. The PR implements the reading sh
 - **Q4. Calculations that already round.** Some figures are computed with an existing, documented rule before any formatter sees them: stored coverage percentages use one decimal (Python `round`); the headline context lines use one decimal with integer half-up arithmetic (CHG-2026-047); the page's by-type and province ratios use `Math.round` to one decimal (CHG-2026-033); computed ratios on the page (spending against budget, CPI change, fuel difference) use one decimal as before; computed rand results (inflation tool, fuel difference) are taken to the cent. This change keeps each existing rule and does not change any data calculation. Should a later change make these calculation rules the same everywhere?
 - **Q5. Detector flag text.** `thusa/detectors.py` writes amounts into stored flag titles and explanations as whole rand (`R{cents/100:,.0f}`). That text is data, not display, and is not changed here. A flag's evidence amount is shown in full in the evidence tables. Should a later change store the full figure in the flag text?
 
+**Q4 and Q5 answered and moved.** The owner answered Q4 and Q5 on 14 Nov 2026 18:12 SAST, as reported to the author (PublicFunds). Exact words are in the private approval record. The work has moved to CHG-2026-059 (work in progress, PR to follow). The leftovers named there remain `thusa/review/warehouse.py:137` (share display, for example `share_of_top15` as `:.1%`) and `thusa/detectors.py:25` (flag text via `_rand`, whole rand). They are not implemented in CHG-2026-058.
+
 ## What changed
 
 Items 1–5 and the review follow-up describe the earlier heads. Where they say two decimals, half-up rounding, `format_pct_parts` or 81.90%, the owner style follow-up below replaces them.
@@ -70,7 +72,7 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 1. Coverage-by-type "Present %" uses `pctPoints` (81.9 shows as 81.90%). The CSV still has the plain stored value.
 2. The table helper now shows a `num` column with a bare numeric `value` through `formatCount` (for example Awards, Present/Partial/Missing, hidden leads). The CSV path is unchanged. Other leftover counts (confirmed-flags heading, coverage row count, report-card flag and gap counts, "most common gap reason" count) use `intg`. Review-app templates format non-cents count columns and status/coverage counts through the `count` and `amount` filters. Years, dates, IDs, SHAs and versions stay unformatted.
 3. Stale second arguments such as `pct(share, 0)` are removed.
-4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). Related choices stay open.
+4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). The related choices (Q4 and Q5) were answered by the owner on 14 Nov 2026 18:12 SAST and moved to CHG-2026-059.
 5. Optional: `format_amount(-0.0)` and any value that rounds to zero show `0.00`, never `-0.00`, with a test. The CHG-2026-056 change-log row, which still said the PR was not merged, now records the merge of PR #5 at 13 Nov 2026 19:16 SAST (merge 8cdf9ad6). That side fix is documentation only.
 
 ### Owner style follow-up (head 0893952b, replaces the rounding and padding above)
@@ -139,4 +141,15 @@ The first heads, the review-follow-up diff, and this owner-style diff (formatter
 
 ## Result
 
-DEV: tests succeeded on this branch. PR open, not merged. No PROD change.
+Implemented / closed. Merged as PR #6 on 14 Nov 2026 18:05 SAST at exact head `78c30c1d0821f93bfb6b8526c54b62ba9572e5fc`, merge commit `1c6ecda931463bf2af9723f3da6fa80e5d3360fd`, tag `snapshot-2026-11-14-1806`. Owner GO, 14 Nov 2026 18:05 SAST, as reported to the author (PublicFunds). Exact words are in the private approval record.
+
+Post-merge checks, 14 Nov 2026 18:06–18:10 SAST, as recorded by CHG-2026-058:
+
+- GitHub Pages build `43613702790` succeeded for head `1c6ecda9` (18:05:40–18:06:07 SAST).
+- `scripts/check_live.py` exited 0 at 18:07 SAST. Live data is still build B20261114T005655Z (generated 2026-11-14 02:57 SAST). The format change is display-only; raw public-data files were not part of this merge.
+- The live file `https://publicfunds.grokforum.site/apps/public-dashboard/index.html` is byte-identical to `apps/public-dashboard/index.html` on `1c6ecda9`, including the `/* format:begin */` … `/* format:end */` block.
+- Headless Chromium on the live dashboard showed the new formats: table money as `R48,227,444,496.00` (and the same row's audited spending `R74,870,489,318.00`); card/prose short form `R74.87 bn` and `R1.98 bn`; the same card's `title` attribute `R74,870,489,318.00`; coverage `75.7%`; counts `1,167` and `1,542`. A native `title` tooltip does not always paint in headless Chrome; the attribute was read from the DOM. Evidence files were kept outside git.
+- Local `uv run thusa report` regenerated the internal text report. `thusa.report.rand_short(120000000)` returns `R1.2 m (R1,200,000.00)`. A typical report line is `total known value R526.8 m (R526,826,020.00)`.
+- `uv run pytest -q tests/test_format.py tests/test_number_format.py` → 85 passed.
+
+Q4 and Q5 were answered by the owner on 14 Nov 2026 18:12 SAST, as reported to the author (PublicFunds), and moved to CHG-2026-059 (work in progress, PR to follow).

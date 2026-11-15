@@ -4,4 +4,4 @@
 | INC-2026-001 | 2026-10-19 09:40 | P4 | eTenders OCDS API delta fails (HTTP 500) after page 2; bulk mirror used | Mitigated (KE-001) | — |
 | INC-2026-002 | 2026-10-19 09:31 | P4 | Vulekamali CKAN API TLS failure; public dataset-page CSV used instead | Mitigated (KE-002) | — |
 | INC-2026-003 | 2026-11-02 03:08 | P3 | Nightly publish stopped: git commit identity missing in new checkout; live site DNS not on GitHub Pages | Open | — |
-| INC-2026-004 | 2026-11-12 02:59 | P3 | Nightly build crashed: fuel history parser fails on '3 085.67' (space thousands separator); nothing published | Open | — |
+| INC-2026-004 | 2026-11-12 02:59 | P3 | Nightly build crashed: fuel history parser fails on '3 085.67' (space thousands separator); nothing published | Closed (14 Nov 2026; CHG-2026-056 merged, nightly B20261114T005655Z succeeded) | — |
