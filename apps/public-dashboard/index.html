@@ -491,14 +491,22 @@ async function vMunicipality(id) {
    financial years ending 2018 to 2024 (municipalities.json fw_years). The list is in alphabetical order only. It is never sorted
    by amount or share (that needs its own owner decision). F&W is never added to irregular or unauthorised expenditure. */
 const FW_STATUS = {fw_unknown: "the F&W amount is not available", denominator_unknown: "audited spending is not available",
-  denominator_not_positive: "audited spending is zero or less", share_over_100: "the F&W amount is larger than audited spending, so one of the two figures is probably incomplete"};
+  denominator_not_positive: "audited spending is zero or less",
+  denominator_incomplete_year: "audited spending for 2017/18 and 2018/19 is incomplete at the source for many municipalities",
+  denominator_no_reference: "there is no other year from 2019/20 to 2023/24 with audited spending to check this figure against",
+  denominator_incomplete: "audited spending is under half of this municipality's usual audited spending, so it is probably incomplete",
+  share_over_100: "the F&W amount is larger than audited spending, so one of the two figures is probably incomplete"};
+const FW_NATIONAL_STATUS = {denominator_incomplete_year: "audited spending for this year is incomplete at the source for many municipalities",
+  no_base: "no municipality has a share for this year"};
 const FW_NOT_THEFT = "It is not proof of theft or corruption.";
 const FW_CAVEATS = [
   "Fruitless and wasteful expenditure is money spent in vain. Reasonable care would have prevented it. Typical causes are interest and penalties on late payments, and payment for goods or services that were not used. " + FW_NOT_THEFT,
   "It is not the same as irregular expenditure or unauthorised expenditure. This page shows only fruitless and wasteful expenditure. We never add the three together.",
   "Share of audited spending = the fruitless and wasteful amount divided by audited operating spending for the same municipality and year. Both figures come from the audited financial statements, through Municipal Money. We cut the share at four decimal places. We do not round it.",
-  "\"Not available\" means that a figure is missing, that audited spending is zero or less, or that the fruitless and wasteful amount is larger than audited spending (then one of the two figures is probably incomplete). \"Not available\" is never zero.",
   "Years shown: 2017/18 to 2023/24. Older years (2011/12 to 2016/17) are not shown yet, because we have not checked them by hand. 2024/25 is not yet available at the source.",
+  "For 2017/18 and 2018/19 we show the amounts but no share. Audited spending for those two years is incomplete at the source for many municipalities, so a share would be wrong.",
+  "From 2019/20 to 2023/24 we check each year's audited spending against the same municipality's other years. If it is under half of the usual (median) figure, it is probably incomplete, and we do not show a share. We also do not show a share when there is no other year to compare with.",
+  "\"Not available\" means that a figure is missing, that audited spending is zero or less or failed the check above, or that the fruitless and wasteful amount is larger than audited spending. The CSV download gives the reason for each row. \"Not available\" is never zero.",
   "The source does not say if an amount is for that year only or a balance from earlier years. A municipality can also change an earlier year's figure in a later year's statements.",
   "The national figure is the sum of the amounts in the municipal financial statements. It is not the Auditor-General's national headline figure, which uses a different group of auditees.",
   "A large municipality can have a large amount but a small share. The list is in alphabetical order. It is not a ranking."];
@@ -550,7 +558,7 @@ function fwMuniSection(mun, m) {
   if (!rows.some(r => r.d.fw)) return el("p", {class: "small muted"}, "Fruitless and wasteful expenditure as a share of audited spending: not available for this municipality.");
   return el("div", {},
     el("h3", {}, "Fruitless and wasteful expenditure as a share of audited spending"),
-    el("p", {class: "small muted"}, "Years 2017/18 to 2023/24 only. Older years are not checked yet. ", FW_NOT_THEFT, " ", el("a", {href: "#/fw"}, "How we calculate the share, and all municipalities"), "."),
+    el("p", {class: "small muted"}, "Years 2017/18 to 2023/24 only. Older years are not checked yet. No share for 2017/18 and 2018/19, because audited spending for those years is incomplete at the source. ", FW_NOT_THEFT, " ", el("a", {href: "#/fw"}, "How we calculate the share, and all municipalities"), "."),
     lineChart(`Fruitless and wasteful expenditure as a share of audited spending, ${m.name}`, rows.map(r => fyLabel(r.y)),
       [{name: "Share of audited spending", color: "#c94a3a", values: rows.map(r => fwShareCsv(r.d))}], {fmt: v => pctPoints(v)}),
     table("Fruitless and wasteful expenditure and audited spending", [
@@ -586,7 +594,7 @@ async function vFw(params) {
     el("p", {class: "lead"}, "Fruitless and wasteful expenditure that municipalities report in their audited financial statements, and its share of their audited spending, for 2017/18 to 2023/24."),
     el("ul", {class: "small"}, FW_CAVEATS.map(t => el("li", {}, t))),
     el("h2", {}, "National view"),
-    el("p", {class: "small muted"}, "All municipalities together. The share uses only municipalities that have both figures and a share that is available."),
+    el("p", {class: "small muted"}, "All municipalities together. The amount includes every municipality with an amount. The share uses only municipalities whose own share is available: a municipality whose share is not available is left out of both parts of the share. There is no national share for 2017/18 and 2018/19."),
     lineChart("Fruitless and wasteful expenditure as a share of audited spending, all municipalities together", nat.map(n => n.fy),
       [{name: "Share of audited spending", color: "#c94a3a", values: nat.map(n => n.share_pct)}], {fmt: v => pctPoints(v)}),
     table("National view, per year", [
@@ -594,9 +602,11 @@ async function vFw(params) {
       {label: "Fruitless & wasteful, all municipalities", num: 1, render: n => randCell(n.fw), csvValue: n => n.fw == null ? null : n.fw / 100, csv: "fruitless_wasteful_rand"},
       {label: "Municipalities with an amount", num: 1, value: n => n.n_fw, csv: "municipalities_with_amount"},
       {label: "Municipalities with a share", num: 1, value: n => n.n_share, csv: "municipalities_with_share"},
-      {label: "Fruitless & wasteful used for the share", num: 1, render: n => randCell(n.fw_share_base), csvValue: n => n.fw_share_base == null ? null : n.fw_share_base / 100, csv: "share_base_fruitless_wasteful_rand"},
-      {label: "Audited spending used for the share", num: 1, render: n => randCell(n.exp_share_base), csvValue: n => n.exp_share_base == null ? null : n.exp_share_base / 100, csv: "share_base_audited_spending_rand"},
-      {label: "Share of audited spending", num: 1, render: n => n.share_pct == null ? unknown("not available") : pctPoints(n.share_pct), csvValue: n => n.share_pct, csv: "fw_share_pct"}],
+      {label: "Municipalities with a share not available", num: 1, value: n => n.n_hidden, csv: "municipalities_share_not_available"},
+      {label: "Fruitless & wasteful used for the share", num: 1, render: n => n.status === "ok" ? randCell(n.fw_share_base) : unknown("not used"), csvValue: n => n.fw_share_base == null ? null : n.fw_share_base / 100, csv: "share_base_fruitless_wasteful_rand"},
+      {label: "Audited spending used for the share", num: 1, render: n => n.status === "ok" ? randCell(n.exp_share_base) : unknown("not used"), csvValue: n => n.exp_share_base == null ? null : n.exp_share_base / 100, csv: "share_base_audited_spending_rand"},
+      {label: "Share of audited spending", num: 1, render: n => n.share_pct == null ? el("span", {class: "unknown", title: FW_NATIONAL_STATUS[n.status] || "not available"}, "not available") : pctPoints(n.share_pct), csvValue: n => n.share_pct, csv: "fw_share_pct"},
+      {label: "Status", csvOnly: true, value: n => n.status, csv: "fw_status"}],
       nat, "fruitless-wasteful-national.csv"),
     el("p", {class: "small muted"}, "Source: the audited financial statements of each municipality, through Municipal Money. Each row in the list below links to its source file."),
     el("h2", {}, "Each municipality"),

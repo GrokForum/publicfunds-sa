@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 
-from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, SHARE_STATUS
+from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, NATIONAL_STATUS, SHARE_STATUS
 from thusa.settings import REPO_ROOT, Paths, load_yaml
 
 SAST = ZoneInfo("Africa/Johannesburg")
@@ -156,8 +156,9 @@ def municipalities(con, refs: SourceRefs) -> dict:
         years[r["gov_body_id"]][r["fye"]]["fw"] = {"share_pct": _plain_decimal(r["fw_share_pct"]),
                                                     "status": r["share_status"], "change": r["fw_change_cents"]}
     fw_national = [{"fye": r["fye"], "fy": r["fy_label"], "fw": r["fw_total_cents"], "n_fw": r["n_fw_known"],
-                    "n_share": r["n_share_known"], "fw_share_base": r["fw_share_base_cents"],
-                    "exp_share_base": r["denom_share_base_cents"], "share_pct": _plain_decimal(r["national_share_pct"])}
+                    "n_share": r["n_share_known"], "n_hidden": r["n_share_hidden"], "fw_share_base": r["fw_share_base_cents"],
+                    "exp_share_base": r["denom_share_base_cents"], "share_pct": _plain_decimal(r["national_share_pct"]),
+                    "status": r["national_share_status"]}
                    for r in _rows(con, "SELECT * FROM marts.fw_national ORDER BY fye")]
     for r in _rows(con, "SELECT * FROM curated.audit_outcome"):
         labels[r["opinion_code"]] = r["opinion_label"]
@@ -184,11 +185,18 @@ def municipalities(con, refs: SourceRefs) -> dict:
                       "null = unknown (not published or not loaded); never read it as zero.",
                       f"fw (CHG-2026-062): fruitless & wasteful expenditure as a share of audited spending (audited.exp), "
                       f"financial years ending {FW_FYE_MIN}-{FW_FYE_MAX} only; earlier years are not yet checked.",
-                      "fw.share_pct: percentage points, cut (not rounded) to 4 decimal places; null unless fw.status is ok.",
+                      f"fw.share_pct: percentage points, cut (not rounded) to 4 decimal places; null unless fw.status is ok. "
+                      f"No share before the year ending {FW_SHARE_FYE_MIN}: audited spending for 2017/18 and 2018/19 is "
+                      "incomplete at the source for many municipalities.",
+                      f"Completeness check ({FW_SHARE_FYE_MIN}-{FW_FYE_MAX}): no share when audited spending is under "
+                      f"{FW_REF_MIN_RATIO:.0%} of the municipality's median audited spending in its other years "
+                      f"{FW_SHARE_FYE_MIN}-{FW_FYE_MAX}, or when there is no other year to compare with.",
                       "fw.status: " + "; ".join(f"{k} = {v}" for k, v in SHARE_STATUS.items()) + ".",
                       "fw.change: F&W amount minus the prior year's amount, in cents; null when either year is unknown.",
-                      "fw_national: per year, fw = sum of known municipal F&W amounts; share_pct = fw_share_base / "
-                      "exp_share_base over the n_share municipalities with fw.status ok. Not the Auditor-General's headline figure."],
+                      "fw_national: per year, fw = sum of all known municipal F&W amounts (hidden shares included); "
+                      "share_pct = fw_share_base / exp_share_base over the n_share municipalities with fw.status ok only; "
+                      "the n_hidden municipalities whose share is hidden are left out of both parts. status: "
+                      + "; ".join(f"{k} = {v}" for k, v in NATIONAL_STATUS.items()) + ". Not the Auditor-General's headline figure."],
             "fw_years": [FW_FYE_MIN, FW_FYE_MAX], "fw_national": fw_national,
             "sources": used, "municipalities": out}
 
