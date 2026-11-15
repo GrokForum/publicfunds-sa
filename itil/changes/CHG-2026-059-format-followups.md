@@ -28,6 +28,7 @@ Two places still showed numbers outside the CHG-2026-057 rules. Bring them in li
    - D4 and D16: "with a known value (R… in total)" now reads "with a known total value of R…". Without this, the new bracket would sit inside another bracket: `(R393.6 m (R393,570,966.00))`. The meaning is the same.
 4. `thusa/review/warehouse.py`: new `share_pct_1dp(part, total)` does the calculation to one decimal (the existing precision rule), and `format_pct_points(…, 1)` shows it. The digits are the same as the old string; a test proves this for every part/total pair up to 400 and for large values.
 5. Tests: `tests/test_format_followups_059.py` (new, see Testing). In `tests/test_number_format.py`, one guard line now checks that `report.py` uses `format_rand_prose` once and `format_rand_short` zero times, because the helper moved. The intent of the guard ("only through the bracketed helper") is the same.
+6. Records only (after PR #7 merged on 15 Nov 2026 14:39 SAST as `bad8f256`): the CHG-2026-058 record (Environment, Result), its change-log row and `STATUS.md` now show PR #7 as merged; "PR to follow" for this change now reads "open PR #8". No code effect.
 
 ## Effect on stored flags and reviews (the owner asked for a plain answer)
 

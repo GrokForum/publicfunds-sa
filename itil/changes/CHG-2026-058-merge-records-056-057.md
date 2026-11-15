@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Post-merge record update after PR #6, 14 Nov 2026 18:05 SAST, as reported to the author (PublicFunds). Review fixes on this PR, 14 Nov 2026, after the owner answered Q4 and Q5 at 18:12 SAST, as reported to the author (PublicFunds). |
-| Environment | Docs only. Nothing is built, run as a publish, or deployed by this change. |
+| Environment | Docs only. Nothing is built, run as a publish, or deployed by this change. Merged to `main` 15 Nov 2026 14:39 SAST as `bad8f256` (PR #7, exact head `4cbdb22b`, tag `snapshot-2026-11-15-1439`); owner GO as reported to the author (PublicFunds). Recorded by CHG-2026-059. |
 | Type | Standard (`itil/change-enablement.md`: "Docs/copy"); only markdown under `itil/` and `STATUS.md` changes, same as CHG-2026-042. |
 | CIs affected | `itil/registers/change-log.md` (CHG-2026-056 and -057 rows, one new row); `itil/registers/incident-log.md` (INC-2026-004); `itil/changes/CHG-2026-056-fuel-thousands-space.md`; `itil/changes/CHG-2026-057-number-format.md`; `itil/incidents/INC-2026-004.md`; `STATUS.md`; this record |
 | Linked records | PRs #5, #6 and #7; CHG-2026-056, CHG-2026-057, CHG-2026-059; INC-2026-004 |
@@ -56,4 +56,4 @@ Close the PR unmerged. If merged: `git revert -m 1 <merge commit of this PR>`.
 
 ## Result
 
-DEV: docs-only PR open, not merged. No PROD change from this record update.
+Merged: PR #7 at exact head `4cbdb22b` as merge commit `bad8f256`, 15 Nov 2026 14:39 SAST, tag `snapshot-2026-11-15-1439`. Docs only; no publish and no data change.
