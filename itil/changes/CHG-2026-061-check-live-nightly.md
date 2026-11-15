@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-on to CSI-036, CHG-2026-032 and the CHG-2026-053 RFC (open PR #2). Drafted 15 Nov 2026. This record is not a merge GO and does not implement the step. |
-| Status | **RFC only.** Local branch `feat/chg-2026-061-check-live-nightly`, not pushed, no PR. Do **not** edit the live skill, the repo skill copy, or the nightly routine prompt in this change. |
+| Status | **RFC only.** Branch `feat/chg-2026-061-check-live-nightly`, open as draft PR #10, not merged. Do **not** edit the live skill, the repo skill copy, or the nightly routine prompt in this change. |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline / distribution). The later step, after an owner GO that names the exact head, changes the nightly routine. This RFC commit itself is docs only. |
 | Environment | Docs only in this change. Pre-change `main` is `8b4f72b80de0f31831bba689130a251488e791bd` (tag `snapshot-2026-11-15-1817`). The later implementation runs on the bot computer (live refresh skill and the nightly routine prompt) and updates the repo skill copy. Nothing is published by this RFC. |
 | CIs affected (this RFC) | `itil/changes/CHG-2026-061-check-live-nightly.md`, `itil/registers/change-log.md` |
@@ -74,7 +74,7 @@ The block reuses the CHG-2026-032:53 wording, with the concrete `--raw-url` from
    `python3 scripts/check_live.py --expect-local public-data/v1/manifest.json --raw-url https://raw.githubusercontent.com/GrokForum/publicfunds-sa/main/public-data/v1/manifest.json --wait 600`
    - Put its `RESULT:` line and any `[BREACH]` / `[WARN]` lines in the nightly report.
    - Exit 0 means OK, or WARN only. If there are `[WARN]` lines, report them; the rest of the routine may finish.
-   - Exit 1 means at least one `[BREACH]` line. A BREACH is reported as a breach, never as success. Do not re-run the publish to "fix" it; report and stop. Follow RB-12.
+   - Exit 1 means at least one `[BREACH]` line. A BREACH is reported as a breach, never as success. Do not re-run the publish to "fix" it; report it, still run the health check (`curl -s http://127.0.0.1:8765/healthz`), then stop. Follow RB-12.
    - Exit 2 means a bad command line and nothing was checked. Report it as a failed check and stop. Do not treat this as OK.
    - If the publish step did not run, or did not push, do not run this after-publish command.
 ```
@@ -171,4 +171,4 @@ Docs-only RFC wording. No SA ID, passport, phone, email, address, account number
 
 ## Result
 
-RFC drafted on a local branch. Not pushed. No PR. Not implemented. The nightly routine, the skills, the scripts and the tests are unchanged by this commit.
+RFC open as draft PR #10, not merged. Not implemented. The nightly routine, the skills, the scripts and the tests are unchanged by this commit.
