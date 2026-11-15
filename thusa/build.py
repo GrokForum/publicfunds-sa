@@ -82,7 +82,7 @@ def build(paths: Paths, as_of: date | None = None, fye_min: int = 2020, fye_max:
     for t in ("curated.gov_body", "curated.muni_fin_line", "curated.nat_budget_line", "curated.uifw_line",
               "curated.audit_outcome", "curated.award", "curated.ocds_release", "curated.restriction",
               "curated.payment", "curated.fuel_price", "curated.cpi", "curated.agsa_audit_outcome",
-              "curated.agsa_uifw", "marts.coverage_cell", "marts.flag"):
+              "curated.agsa_uifw", "marts.coverage_cell", "marts.flag", "marts.fw_metric", "marts.fw_national"):
         summary["rows"][t] = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
     results = dq.run(con, build_id, min_rows, raw_root=paths.root)
     summary["dq"] = {"pass": sum(r["status"] == "pass" for r in results),

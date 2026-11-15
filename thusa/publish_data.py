@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 
+from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, SHARE_STATUS
 from thusa.settings import REPO_ROOT, Paths, load_yaml
 
 SAST = ZoneInfo("Africa/Johannesburg")
@@ -55,6 +56,11 @@ def sast(ts) -> str | None:
 
 def fy_label(fye: int) -> str:
     return f"{fye - 1}/{str(fye)[-2:]}"
+
+
+def _plain_decimal(v):
+    """A DECIMAL from DuckDB as a plain JSON number with the same digits (trailing zeros dropped), or None."""
+    return None if v is None else float(v)
 
 
 def _rows(con, sql, params=None) -> list[dict]:
@@ -144,6 +150,15 @@ def municipalities(con, refs: SourceRefs) -> dict:
         u = years[r["gov_body_id"]][r["fye"]].setdefault("uifw", {})
         u[r["uifw_type"]] = r["amount_cents"]
         u["src"] = refs.ref(r["source_sha256"], used)
+    # CHG-2026-062 Phase 1: F&W share of audited spending (financial years ending 2018-2024 only). The amounts are
+    # already in uifw.fruitless_wasteful and audited.exp; only the share, its status and the change are added.
+    for r in _rows(con, "SELECT gov_body_id, fye, fw_share_pct, share_status, fw_change_cents FROM marts.fw_metric"):
+        years[r["gov_body_id"]][r["fye"]]["fw"] = {"share_pct": _plain_decimal(r["fw_share_pct"]),
+                                                    "status": r["share_status"], "change": r["fw_change_cents"]}
+    fw_national = [{"fye": r["fye"], "fy": r["fy_label"], "fw": r["fw_total_cents"], "n_fw": r["n_fw_known"],
+                    "n_share": r["n_share_known"], "fw_share_base": r["fw_share_base_cents"],
+                    "exp_share_base": r["denom_share_base_cents"], "share_pct": _plain_decimal(r["national_share_pct"])}
+                   for r in _rows(con, "SELECT * FROM marts.fw_national ORDER BY fye")]
     for r in _rows(con, "SELECT * FROM curated.audit_outcome"):
         labels[r["opinion_code"]] = r["opinion_label"]
         years[r["gov_body_id"]][r["fye"]]["audit"] = {"code": r["opinion_code"],
@@ -166,7 +181,15 @@ def municipalities(con, refs: SourceRefs) -> dict:
                       "basis: pub = total as published, sum = summed from published line items (KE-008).",
                       "years are keyed by financial-year end; audit.code labels are in audit_opinions.",
                       "audit.report: AGSA audit report link; prepend report_prefix unless it starts with http.",
-                      "null = unknown (not published or not loaded); never read it as zero."],
+                      "null = unknown (not published or not loaded); never read it as zero.",
+                      f"fw (CHG-2026-062): fruitless & wasteful expenditure as a share of audited spending (audited.exp), "
+                      f"financial years ending {FW_FYE_MIN}-{FW_FYE_MAX} only; earlier years are not yet checked.",
+                      "fw.share_pct: percentage points, cut (not rounded) to 4 decimal places; null unless fw.status is ok.",
+                      "fw.status: " + "; ".join(f"{k} = {v}" for k, v in SHARE_STATUS.items()) + ".",
+                      "fw.change: F&W amount minus the prior year's amount, in cents; null when either year is unknown.",
+                      "fw_national: per year, fw = sum of known municipal F&W amounts; share_pct = fw_share_base / "
+                      "exp_share_base over the n_share municipalities with fw.status ok. Not the Auditor-General's headline figure."],
+            "fw_years": [FW_FYE_MIN, FW_FYE_MAX], "fw_national": fw_national,
             "sources": used, "municipalities": out}
 
 

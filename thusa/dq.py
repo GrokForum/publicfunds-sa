@@ -13,7 +13,8 @@ CURATED_LINEAGE_TABLES = ["gov_body", "muni_fin_line", "muni_total", "nat_budget
                           "ocds_release", "restriction", "payment", "fuel_price", "cpi"]
 MIN_ROWS = {"curated.gov_body": 250, "curated.muni_fin_line": 50_000, "curated.nat_budget_line": 50,
             "curated.uifw_line": 1_000, "curated.audit_outcome": 1_000, "curated.award": 1_000,
-            "curated.ocds_release": 10_000, "curated.restriction": 100, "marts.coverage_cell": 1_000}
+            "curated.ocds_release": 10_000, "curated.restriction": 100, "marts.coverage_cell": 1_000,
+            "marts.fw_metric": 1_000}
 
 # CHG-2026-035: months of curated.fuel_price that are known to be absent between the first and the last month present.
 # Each entry is (year, month) -> "KE id: reason". EMPTY on purpose: no month is missing from 2019-01 to the latest month
@@ -119,7 +120,74 @@ def checks(min_rows: dict | None = None) -> list[tuple[str, str, str]]:
         ("award_buyer_match_rate_info", "warn",
          "SELECT count(*) FILTER (WHERE buyer_gov_body_id IS NULL AND buyer_name ILIKE '%municipal%') FROM curated.award"),
     ]
+    out += fw_checks()
     return out
+
+
+def fw_checks() -> list[tuple[str, str, str]]:
+    """CHG-2026-062 Phase 1: checks for marts.fw_metric and marts.fw_national (F&W share of audited spending)."""
+    from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, SHARE_STATUS
+    statuses = ",".join(f"'{s}'" for s in SHARE_STATUS)
+    fw_src = ("FROM curated.uifw_line u JOIN curated.gov_body g ON g.gov_body_id = u.gov_body_id AND g.sphere = 'local' "
+              f"WHERE u.uifw_type = 'fruitless_wasteful' AND u.measure = 'reported' AND u.fye BETWEEN {FW_FYE_MIN} AND {FW_FYE_MAX}")
+    return [
+        ("unique:fw_metric", "error",
+         "SELECT count(*) - count(DISTINCT (gov_body_id, fye)) FROM marts.fw_metric"),
+        ("fw_years_in_range", "error",
+         f"SELECT count(*) FROM marts.fw_metric WHERE fye NOT BETWEEN {FW_FYE_MIN} AND {FW_FYE_MAX}"),
+        ("fw_share_status_valid", "error",
+         f"SELECT count(*) FROM marts.fw_metric WHERE share_status IS NULL OR share_status NOT IN ({statuses})"),
+        # a share only when the status is 'ok'; every other status is "not available" (NULL), never 0
+        ("fw_share_only_when_ok", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE (share_status = 'ok') <> (fw_share_pct IS NOT NULL)"),
+        ("fw_status_matches_inputs", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE "
+         "(share_status = 'fw_unknown') <> (fw_cents IS NULL) "
+         "OR (share_status = 'denominator_unknown' AND denom_cents IS NOT NULL) "
+         "OR (share_status = 'denominator_not_positive' AND NOT coalesce(denom_cents <= 0, false)) "
+         "OR (share_status IN ('ok', 'share_over_100') AND NOT coalesce(denom_cents > 0, false))"),
+        # cut, not rounded: 0 <= fw x 10^6 - share x 10^4 x denom < denom (exact integer arithmetic). A very small
+        # non-zero amount can cut to 0.0000; the page then shows "under 0.0001%", never 0%.
+        ("fw_share_matches_inputs", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE share_status = 'ok' AND NOT ("
+         "abs(fw_cents)::HUGEINT * 1000000 - (abs(fw_share_pct) * 10000)::HUGEINT * denom_cents::HUGEINT "
+         "BETWEEN 0 AND denom_cents::HUGEINT - 1 AND (fw_share_pct = 0 OR sign(fw_share_pct) = sign(fw_cents)))"),
+        ("fw_share_not_over_100", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE fw_share_pct > 100"),
+        ("fw_change_matches_prior_year", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE fw_change_cents IS DISTINCT FROM (fw_cents - fw_prev_cents)"),
+        # T3: every F&W line in range is in the mart, and the yearly sums agree to the cent
+        ("fw_rows_complete", "error",
+         f"SELECT count(*) {fw_src} AND NOT EXISTS (SELECT 1 FROM marts.fw_metric m "
+         "WHERE m.gov_body_id = u.gov_body_id AND m.fye = u.fye AND m.fw_cents IS NOT DISTINCT FROM u.amount_cents)"),
+        ("fw_totals_match_source", "error",
+         f"SELECT count(*) FROM (SELECT u.fye, sum(u.amount_cents) AS s {fw_src} GROUP BY u.fye) a "
+         "FULL JOIN (SELECT fye, sum(fw_cents) AS s FROM marts.fw_metric WHERE fw_cents IS NOT NULL GROUP BY fye) b "
+         "USING (fye) WHERE a.s IS DISTINCT FROM b.s"),
+        ("fw_national_matches_metric", "error",
+         "SELECT count(*) FROM marts.fw_national n FULL JOIN (SELECT fye, sum(fw_cents) AS s, count(fw_cents) AS c, "
+         "count(*) FILTER (WHERE share_status = 'ok') AS k FROM marts.fw_metric GROUP BY fye) m USING (fye) "
+         "WHERE n.fw_total_cents IS DISTINCT FROM m.s OR n.n_fw_known IS DISTINCT FROM m.c OR n.n_share_known IS DISTINCT FROM m.k"),
+        ("lineage_present:fw_metric", "error",
+         "SELECT count(*) FROM marts.fw_metric WHERE source_id IS NULL OR source_file IS NULL "
+         "OR source_sha256 IS NULL OR fetched_at_utc IS NULL"),
+        ("lineage_resolves:fw_metric", "error",
+         "SELECT count(*) FROM marts.fw_metric m LEFT JOIN ops.raw_file r ON r.sha256 = m.source_sha256 WHERE r.sha256 IS NULL"),
+        ("lineage_resolves:fw_metric_denominator", "error",
+         "SELECT count(*) FROM marts.fw_metric m LEFT JOIN ops.raw_file r ON r.sha256 = m.denom_source_sha256 "
+         "WHERE m.denom_source_sha256 IS NOT NULL AND r.sha256 IS NULL"),
+        # warn only: shares withheld because F&W is larger than audited spending (reported so a person can look)
+        ("fw_share_over_100_info", "warn",
+         "SELECT count(*) FROM marts.fw_metric WHERE share_status = 'share_over_100'"),
+        # T2 (warn only): Municipal Money F&W against AGSA MFMA Annexure 1 (financial audits) for linked municipalities.
+        # AGSA amounts are in R million, so a gap up to R50,000.00 is accepted; warn when more than 2% are outside it.
+        ("fw_agsa_reconcile_info", "warn",
+         "SELECT CASE WHEN count(*) FILTER (WHERE abs(m.fw_cents - a.amount_cents) > 5000000) > 0.02 * count(*) "
+         "THEN count(*) FILTER (WHERE abs(m.fw_cents - a.amount_cents) > 5000000) ELSE 0 END "
+         "FROM curated.agsa_uifw a JOIN marts.fw_metric m ON m.gov_body_id = a.gov_body_id AND m.fye = a.fye "
+         "WHERE a.regime = 'MFMA' AND a.uifw_type = 'fruitless_wasteful' AND a.audit_group LIKE 'Financial audits%' "
+         "AND a.amount_cents IS NOT NULL AND m.fw_cents IS NOT NULL"),
+    ]
 
 
 def run(con, build_id: str, min_rows: dict | None = None, raw_root: Path | None = None) -> list[dict]:

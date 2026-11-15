@@ -90,7 +90,7 @@ details summary{cursor:pointer;font-weight:600}
   <div class="bar"><a class="brand" href="#/">PublicFunds SA <small>follow the public money</small></a>
     <button id="navtoggle" aria-expanded="false" aria-controls="nav">Menu</button></div>
   <nav id="nav" aria-label="Main"><ul>
-    <li><a href="#/">Home</a></li><li><a href="#/coverage">Data coverage</a></li><li><a href="#/municipalities">Municipalities</a></li>
+    <li><a href="#/">Home</a></li><li><a href="#/coverage">Data coverage</a></li><li><a href="#/municipalities">Municipalities</a></li><li><a href="#/fw">Fruitless &amp; wasteful</a></li>
     <li><a href="#/departments">National departments</a></li><li><a href="#/tenders">Tenders</a></li><li><a href="#/flags">Flags</a></li>
     <li><a href="#/tools">Tools</a></li><li><a href="#/unknowns">Known unknowns</a></li><li><a href="#/changes">What's new</a></li><li><a href="#/sources">Sources &amp; method</a></li><li><a href="#/glossary">Glossary</a></li></ul></nav>
 </header>
@@ -465,6 +465,7 @@ async function vMunicipality(id) {
       ...[["irregular", "Irregular"], ["fruitless_wasteful", "Fruitless & wasteful"], ["unauthorised", "Unauthorised"]].map(([k, lb]) => (
         {label: lb, num: 1, render: r => randCell(r.d.uifw[k] ?? null), csvValue: r => r.d.uifw[k] == null ? null : r.d.uifw[k] / 100, csv: k + "_rand"})),
       {label: "Source", render: r => srcLink(mun, r.d.uifw.src), csvValue: r => srcUrl(mun, r.d.uifw.src), csv: "source_url"}], uifwRows, `${m.code}-uifw.csv`),
+    fwMuniSection(mun, m),
     el("h2", {}, "Audit opinions"),
     el("p", {class: "small muted"}, "From the Auditor-General. Best to worst: unqualified with no findings ('clean'), unqualified with findings, qualified, adverse, disclaimer. 'Outstanding' means the audit was not finished."),
     table("Audit opinion history", [
@@ -485,6 +486,127 @@ async function vMunicipality(id) {
     covE ? table("Coverage", [{label: "Data type", value: r => DT[r]}, ...cov.years.map((y, k) => ({label: cov.fy_labels[k], render: r => el("span", {class: "chip s-" + covE.c[r][k], style: "color:#fff"}, SYM[covE.c[r][k]] + " " + STATE[covE.c[r][k]]), value: r => STATE[covE.c[r][k]]}))], cov.data_types, `${m.code}-coverage.csv`) : unknown(),
     el("p", {}, el("a", {href: "#/m/" + encodeURIComponent(m.id) + "/card"}, "Report card (share-friendly summary) →"), " · ", el("a", {href: "#/tools/compare?a=" + encodeURIComponent(m.id)}, "Compare with another municipality →")));
 }
+
+/* fw:begin  CHG-2026-062 Phase 1: fruitless and wasteful (F&W) expenditure as a share of audited spending, municipalities only,
+   financial years ending 2018 to 2024 (municipalities.json fw_years). The list is in alphabetical order only. It is never sorted
+   by amount or share (that needs its own owner decision). F&W is never added to irregular or unauthorised expenditure. */
+const FW_STATUS = {fw_unknown: "the F&W amount is not available", denominator_unknown: "audited spending is not available",
+  denominator_not_positive: "audited spending is zero or less", share_over_100: "the F&W amount is larger than audited spending, so one of the two figures is probably incomplete"};
+const FW_NOT_THEFT = "It is not proof of theft or corruption.";
+const FW_CAVEATS = [
+  "Fruitless and wasteful expenditure is money spent in vain. Reasonable care would have prevented it. Typical causes are interest and penalties on late payments, and payment for goods or services that were not used. " + FW_NOT_THEFT,
+  "It is not the same as irregular expenditure or unauthorised expenditure. This page shows only fruitless and wasteful expenditure. We never add the three together.",
+  "Share of audited spending = the fruitless and wasteful amount divided by audited operating spending for the same municipality and year. Both figures come from the audited financial statements, through Municipal Money. We cut the share at four decimal places. We do not round it.",
+  "\"Not available\" means that a figure is missing, that audited spending is zero or less, or that the fruitless and wasteful amount is larger than audited spending (then one of the two figures is probably incomplete). \"Not available\" is never zero.",
+  "Years shown: 2017/18 to 2023/24. Older years (2011/12 to 2016/17) are not shown yet, because we have not checked them by hand. 2024/25 is not yet available at the source.",
+  "The source does not say if an amount is for that year only or a balance from earlier years. A municipality can also change an earlier year's figure in a later year's statements.",
+  "The national figure is the sum of the amounts in the municipal financial statements. It is not the Auditor-General's national headline figure, which uses a different group of auditees.",
+  "A large municipality can have a large amount but a small share. The list is in alphabetical order. It is not a ranking."];
+function fwYears(mun) { const [a, b] = mun.fw_years || [2018, 2024], ys = []; for (let y = a; y <= b; y++) ys.push(String(y)); return ys; }
+function fwShareText(d) {
+  const f = d && d.fw; if (!f || f.status !== "ok" || f.share_pct == null) return null;
+  const amt = d.uifw ? d.uifw.fruitless_wasteful : null;
+  return f.share_pct === 0 && amt > 0 ? "under 0.0001%" : pctPoints(f.share_pct);   // a small amount cut to 0.0000 is not 0%
+}
+function fwWhy(d) { const f = d && d.fw; return f && FW_STATUS[f.status] ? FW_STATUS[f.status] : "no data for this year"; }
+function fwShareCell(d) { const t = fwShareText(d); return t ? t : el("span", {class: "unknown", title: fwWhy(d)}, "not available"); }
+function fwShareCsv(d) { return d && d.fw && d.fw.status === "ok" ? d.fw.share_pct : null; }
+function fwStatusCsv(d) { return d && d.fw ? d.fw.status : "no_data"; }
+/* line chart with gaps for unknown values; the table next to it carries the same numbers */
+function fwNiceStep(max) {
+  const raw = max / 4, e = Math.floor(Math.log10(raw)), f = raw / 10 ** e, m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return {m, e};
+}
+function fwTick(k, s) { return s.e < 0 ? (k * s.m) / 10 ** -s.e : k * s.m * 10 ** s.e; }   // exact multiples, so the label shows clean digits
+function lineChart(title, labels, series, opts = {}) {
+  const W = 640, H = 240, L = 64, R = 10, T = 18, B = 34, w = W - L - R, h = H - T - B;
+  const vals = series.flatMap(s => s.values.filter(v => v != null)); if (!vals.length) return el("p", {class: "muted small"}, "No known values to chart.");
+  const s0 = fwNiceStep(Math.max(...vals) || 1); let top = 4; while (fwTick(top, s0) < Math.max(...vals)) top++;
+  const max = fwTick(top, s0), n = labels.length, gw = w / n;
+  const y = v => T + h - v / max * h, x = i => L + gw * i + gw / 2;
+  const ns = "http://www.w3.org/2000/svg", s = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const svg = s("svg", {viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": title});
+  const tt = s("title", {}); tt.textContent = title; svg.append(tt);
+  for (let k = 0; k <= top; k++) { const v = fwTick(k, s0), yy = y(v);
+    svg.append(s("line", {x1: L, x2: W - R, y1: yy, y2: yy, class: "axis"}));
+    const tx = s("text", {x: L - 6, y: yy + 4, "text-anchor": "end"}); tx.textContent = opts.fmt ? opts.fmt(v) : String(v); svg.append(tx); }
+  labels.forEach((lb, i) => { const tx = s("text", {x: x(i), y: H - 12, "text-anchor": "middle"}); tx.textContent = lb; svg.append(tx); });
+  series.forEach(se => {
+    let seg = [];
+    const flush = () => { if (seg.length > 1) svg.append(s("polyline", {points: seg.join(" "), fill: "none", stroke: se.color, "stroke-width": 2})); seg = []; };
+    se.values.forEach((v, i) => {
+      if (v == null) { flush(); const tx = s("text", {x: x(i), y: T + h - 4, "text-anchor": "middle"}); tx.textContent = "?"; svg.append(tx); return; }
+      seg.push(`${x(i)},${y(v)}`);
+      const c = s("circle", {cx: x(i), cy: y(v), r: 3.5, fill: se.color}), ti = s("title", {});
+      ti.textContent = `${se.name}, ${labels[i]}: ${opts.fmt ? opts.fmt(v) : String(v)}`; c.append(ti); svg.append(c);
+    });
+    flush();
+  });
+  const leg = el("div", {class: "legend", "aria-hidden": "true"}, series.map(se => el("span", {}, el("i", {style: `background:${se.color}`}), se.name)), el("span", {class: "muted"}, "? = not available"));
+  return el("figure", {style: "margin:0"}, svg, leg);
+}
+function fwMuniSection(mun, m) {
+  const rows = fwYears(mun).map(y => ({y, d: m.years[y] || {}}));
+  if (!rows.some(r => r.d.fw)) return el("p", {class: "small muted"}, "Fruitless and wasteful expenditure as a share of audited spending: not available for this municipality.");
+  return el("div", {},
+    el("h3", {}, "Fruitless and wasteful expenditure as a share of audited spending"),
+    el("p", {class: "small muted"}, "Years 2017/18 to 2023/24 only. Older years are not checked yet. ", FW_NOT_THEFT, " ", el("a", {href: "#/fw"}, "How we calculate the share, and all municipalities"), "."),
+    lineChart(`Fruitless and wasteful expenditure as a share of audited spending, ${m.name}`, rows.map(r => fyLabel(r.y)),
+      [{name: "Share of audited spending", color: "#c94a3a", values: rows.map(r => fwShareCsv(r.d))}], {fmt: v => pctPoints(v)}),
+    table("Fruitless and wasteful expenditure and audited spending", [
+      {label: "Year", value: r => fyLabel(r.y)},
+      {label: "Fruitless & wasteful", num: 1, render: r => randCell(r.d.uifw ? r.d.uifw.fruitless_wasteful ?? null : null), csvValue: r => r.d.uifw && r.d.uifw.fruitless_wasteful != null ? r.d.uifw.fruitless_wasteful / 100 : null, csv: "fruitless_wasteful_rand"},
+      {label: "Audited spending", num: 1, render: r => randCell(r.d.audited ? r.d.audited.exp ?? null : null), csvValue: r => r.d.audited && r.d.audited.exp != null ? r.d.audited.exp / 100 : null, csv: "audited_spending_rand"},
+      {label: "Share of audited spending", num: 1, render: r => fwShareCell(r.d), csvValue: r => fwShareCsv(r.d), csv: "fw_share_pct"},
+      {label: "Change from the year before", num: 1, render: r => randCell(r.d.fw ? r.d.fw.change ?? null : null), csvValue: r => r.d.fw && r.d.fw.change != null ? r.d.fw.change / 100 : null, csv: "fw_change_rand"},
+      {label: "Status", csvOnly: true, value: r => fwStatusCsv(r.d), csv: "fw_status"},
+      {label: "Source", render: r => r.d.uifw ? srcLink(mun, r.d.uifw.src) : unknown("none"), csvValue: r => r.d.uifw ? srcUrl(mun, r.d.uifw.src) : "", csv: "source_url"}],
+      rows, `${m.code}-fruitless-wasteful.csv`));
+}
+async function vFw(params) {
+  const mun = await load("municipalities.json");
+  const years = fwYears(mun), nat = mun.fw_national || [];
+  const st = {y: years.includes(params.get("y")) ? params.get("y") : years[years.length - 1], p: params.get("p") || ""};
+  const out = el("div");
+  function draw() {
+    const rows = mun.municipalities.filter(m => (!st.p || m.province === st.p) && m.years[st.y] && (m.years[st.y].fw || m.years[st.y].uifw))
+      .map(m => ({m, d: m.years[st.y]}))
+      .sort((a, b) => a.m.name.localeCompare(b.m.name, "en") || a.m.code.localeCompare(b.m.code, "en"));   // alphabetical: never by amount or share
+    out.replaceChildren(table(`Municipalities, ${fyLabel(st.y)}, in alphabetical order (not a ranking)`, [
+      {label: "Municipality", render: r => el("a", {href: "#/m/" + encodeURIComponent(r.m.id)}, r.m.name), value: r => r.m.name},
+      {label: "Province", value: r => prov(r.m.province)}, {label: "Type", value: r => TYPES[r.m.type] || r.m.type},
+      {label: "Fruitless & wasteful", num: 1, render: r => randCell(r.d.uifw ? r.d.uifw.fruitless_wasteful ?? null : null), csvValue: r => r.d.uifw && r.d.uifw.fruitless_wasteful != null ? r.d.uifw.fruitless_wasteful / 100 : null, csv: "fruitless_wasteful_rand"},
+      {label: "Audited spending", num: 1, render: r => randCell(r.d.audited ? r.d.audited.exp ?? null : null), csvValue: r => r.d.audited && r.d.audited.exp != null ? r.d.audited.exp / 100 : null, csv: "audited_spending_rand"},
+      {label: "Share of audited spending", num: 1, render: r => fwShareCell(r.d), csvValue: r => fwShareCsv(r.d), csv: "fw_share_pct"},
+      {label: "Status", csvOnly: true, value: r => fwStatusCsv(r.d), csv: "fw_status"},
+      {label: "Source", render: r => r.d.uifw ? srcLink(mun, r.d.uifw.src) : unknown("none"), csvValue: r => r.d.uifw ? srcUrl(mun, r.d.uifw.src) : "", csv: "source_url"}],
+      rows, `fruitless-wasteful-${st.y}.csv`, {limit: 400}));
+  }
+  setView("Fruitless and wasteful expenditure",
+    el("p", {class: "lead"}, "Fruitless and wasteful expenditure that municipalities report in their audited financial statements, and its share of their audited spending, for 2017/18 to 2023/24."),
+    el("ul", {class: "small"}, FW_CAVEATS.map(t => el("li", {}, t))),
+    el("h2", {}, "National view"),
+    el("p", {class: "small muted"}, "All municipalities together. The share uses only municipalities that have both figures and a share that is available."),
+    lineChart("Fruitless and wasteful expenditure as a share of audited spending, all municipalities together", nat.map(n => n.fy),
+      [{name: "Share of audited spending", color: "#c94a3a", values: nat.map(n => n.share_pct)}], {fmt: v => pctPoints(v)}),
+    table("National view, per year", [
+      {label: "Year", value: n => n.fy},
+      {label: "Fruitless & wasteful, all municipalities", num: 1, render: n => randCell(n.fw), csvValue: n => n.fw == null ? null : n.fw / 100, csv: "fruitless_wasteful_rand"},
+      {label: "Municipalities with an amount", num: 1, value: n => n.n_fw, csv: "municipalities_with_amount"},
+      {label: "Municipalities with a share", num: 1, value: n => n.n_share, csv: "municipalities_with_share"},
+      {label: "Fruitless & wasteful used for the share", num: 1, render: n => randCell(n.fw_share_base), csvValue: n => n.fw_share_base == null ? null : n.fw_share_base / 100, csv: "share_base_fruitless_wasteful_rand"},
+      {label: "Audited spending used for the share", num: 1, render: n => randCell(n.exp_share_base), csvValue: n => n.exp_share_base == null ? null : n.exp_share_base / 100, csv: "share_base_audited_spending_rand"},
+      {label: "Share of audited spending", num: 1, render: n => n.share_pct == null ? unknown("not available") : pctPoints(n.share_pct), csvValue: n => n.share_pct, csv: "fw_share_pct"}],
+      nat, "fruitless-wasteful-national.csv"),
+    el("p", {class: "small muted"}, "Source: the audited financial statements of each municipality, through Municipal Money. Each row in the list below links to its source file."),
+    el("h2", {}, "Each municipality"),
+    el("div", {class: "tools"},
+      el("label", {}, "Year", el("select", {onchange: e => { st.y = e.target.value; draw(); }}, years.map(y => el("option", {value: y, selected: y === st.y}, fyLabel(y))))),
+      el("label", {}, "Province", el("select", {onchange: e => { st.p = e.target.value; draw(); }}, [["", "All provinces"], ...Object.entries(PROVINCES)].map(([v, t]) => el("option", {value: v, selected: v === st.p}, t))))),
+    out);
+  draw();
+}
+/* fw:end */
 
 async function showAwards(box, buyerIds, name) {
   const files = await loadAwards(), ts = await load("tenders-summary.json");
@@ -1033,7 +1155,7 @@ async function vCard(id) {
 const routes = [
   [/^#?\/?$/, () => vHome()], [/^#\/coverage$/, (m, p) => vCoverage(p)], [/^#\/municipalities$/, (m, p) => vMunicipalities(p)],
   [/^#\/m\/(.+)\/card$/, m => vCard(decodeURIComponent(m[1]))], [/^#\/m\/(.+)$/, m => vMunicipality(decodeURIComponent(m[1]))], [/^#\/departments$/, () => vDepartments()], [/^#\/d\/(.+)$/, m => vDepartment(decodeURIComponent(m[1]))],
-  [/^#\/tenders$/, (m, p) => vTenders(p)], [/^#\/flags$/, () => vFlags()], [/^#\/tools(?:\/(\w+))?$/, (m, p) => vTools(m[1], p)], [/^#\/sources$/, () => vSources()], [/^#\/unknowns$/, () => vUnknowns()], [/^#\/changes$/, () => vChanges()], [/^#\/glossary$/, () => vGlossary()]];
+  [/^#\/fw$/, (m, p) => vFw(p)], [/^#\/tenders$/, (m, p) => vTenders(p)], [/^#\/flags$/, () => vFlags()], [/^#\/tools(?:\/(\w+))?$/, (m, p) => vTools(m[1], p)], [/^#\/sources$/, () => vSources()], [/^#\/unknowns$/, () => vUnknowns()], [/^#\/changes$/, () => vChanges()], [/^#\/glossary$/, () => vGlossary()]];
 async function route() {
   const [path, qs] = (location.hash || "#/").split("?"), params = new URLSearchParams(qs || "");
   const navHref = path.startsWith("#/m/") ? "#/municipalities" : path.startsWith("#/d/") ? "#/departments" : path.startsWith("#/tools") ? "#/tools" : (path.length > 2 ? path : "#/");
