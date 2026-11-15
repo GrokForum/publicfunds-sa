@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | Owner GO for outstanding backlog items, 6 Nov 2026 SAST (message t247u), as reported to the author (PublicFunds) |
+| Requested by / date (SAST) | Owner GO for outstanding backlog items, 6 Nov 2026 SAST (message t247u), as reported to the author (PublicFunds). The close-out of CHG-2026-060 (PR #9 merge) is folded into this PR after that merge on 15 Nov 2026 18:17 SAST, as reported to the author (PublicFunds). |
 | Status | Open PR, not merged. Needs second review PASSes on the exact head, then an owner merge GO naming this head |
 | Type | Standard (docs only) |
 | Environment | Records only. No code, test or data change |
-| CIs affected | `changes/CAB-DECISION.md`, `itil/registers/change-log.md`, this file |
+| CIs affected | `changes/CAB-DECISION.md`, `itil/registers/change-log.md`, `itil/changes/CHG-2026-060-close-059.md`, `STATUS.md`, this file |
 | Rollback | Close the PR. If merged: `git revert -m 1 <merge commit>` |
 
 ## Goal
@@ -20,6 +20,7 @@ Remove leftover meta phrasing in `changes/CAB-DECISION.md` that still says "Owne
 3. Lines for 24 Oct 10:39, 11:07 and 16:06: "Owner's GO, quoted (...)" → "Owner's GO (...)".
 4. Two later "owner GO, quoted from the owner's chat message" clauses → "recorded by PublicFunds from the owner chat by role and date".
 5. A change-log row.
+6. After PR #9 (CHG-2026-060) merged, this PR also closes out that record: Status, Environment and Result set to implemented/closed (merge `8b4f72b8`, exact head `0243d3ed`, 15 Nov 2026 18:17 SAST, tag `snapshot-2026-11-15-1817`, owner GO as reported to the author (PublicFunds)); the CHG-2026-060 change-log row status updated; `STATUS.md` moved CHG-2026-060 to merged and lists the open docs PRs.
 
 ## Stays the same
 
