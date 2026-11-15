@@ -12,7 +12,7 @@
 - Open PRs on GrokForum/publicfunds-sa:
   - #1–#4 (CHG-2026-052 to CHG-2026-055, docs only) need a rebase onto current `main`, then fresh reviews and an owner GO on each new head.
   - #7 (CHG-2026-058): this records PR, open, not merged.
-  - CHG-2026-059 (format follow-ups for Q4 and Q5, which the owner answered on 14 Nov 2026 18:12 SAST): work in progress, PR to follow.
+  - CHG-2026-059 (format follow-ups for Q4 and Q5, which the owner answered on 14 Nov 2026 18:12 SAST): open PR #8.
 - Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate: 58 pass, 1 warn (`award_buyer_match_rate_info`, 207 unmatched award-buyer rows), 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
 - Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
 
