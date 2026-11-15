@@ -192,7 +192,8 @@ def test_text_report_short_form_carries_full_figure_in_brackets():
     assert rand_short(None) == "unknown"
     assert rand_short(-0.0) == "R0.00"
     src = (ROOT / "thusa" / "report.py").read_text(encoding="utf-8")
-    assert src.count("format_rand_short(") == 1         # only through the bracketed helper
+    # only through the bracketed helper (CHG-2026-059: the helper moved to thusa.format.format_rand_prose)
+    assert src.count("format_rand_short(") == 0 and src.count("format_rand_prose(") == 1
 
 
 def test_rendered_text_report_sentence_has_bracketed_full_figure():

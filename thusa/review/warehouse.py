@@ -12,7 +12,7 @@ from pathlib import Path
 
 import duckdb
 
-from thusa.format import format_rand
+from thusa.format import format_pct_points, format_rand
 
 FLAG_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -23,6 +23,16 @@ TYPE_LABEL = {"core": "Core (all four)", "budget": "Budget (orig. + adj.)", "act
               "uifw": "UIF&W expenditure", "audit_opinion": "Audit opinion", "procurement": "eTenders awards"}
 SEVERITIES = ["high", "med", "low", "info"]
 SEV_ORDER = {s: i for i, s in enumerate(SEVERITIES)}
+
+
+def share_pct_1dp(part, total) -> float:
+    """A share in percentage points to one decimal (CHG-2026-059).
+
+    This is the calculation's documented precision rule, and it is the same rule as the
+    old ``f"{part / total:.1%}"`` string (Python's correctly rounded one-decimal format),
+    so the digits do not change. The shared formatter then shows it: 42.3 -> "42.3%".
+    """
+    return float(f"{part / total * 100:.1f}")
 
 
 class WarehouseMissing(RuntimeError):
@@ -134,7 +144,7 @@ class Warehouse:
                                   GROUP BY 1 ORDER BY value_cents DESC LIMIT 15""", [key])
                 tot = sum(x["value_cents"] for x in t) or None
                 for x in t:
-                    x["share_of_top15"] = f"{x['value_cents'] / tot:.1%}" if tot else None
+                    x["share_of_top15"] = format_pct_points(share_pct_1dp(x["value_cents"], tot), 1) if tot else None
                 out["tables"] = [("Largest suppliers (single-supplier awards with a usable value, last 3 years)", t)]
             else:
                 t = self.rows(f"""SELECT coalesce(value_note, CASE WHEN value_cents IS NULL THEN 'unknown (no value or 0)'

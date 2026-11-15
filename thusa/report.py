@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import ListedColormap  # noqa: E402
 from jinja2 import Environment, select_autoescape  # noqa: E402
 
-from thusa.format import format_amount, format_count, format_rand, format_rand_short  # noqa: E402
+from thusa.format import format_amount, format_count, format_rand, format_rand_prose  # noqa: E402
 from thusa.settings import Paths  # noqa: E402
 
 STATE_ORDER = ["present", "partial", "missing", "n.a."]
@@ -48,8 +48,7 @@ def rand_short(cents):
     "R1.2 m (R1,200,000.00)". When nothing is shortened (under R1 m, or unknown), the
     full figure is shown once, with no brackets.
     """
-    short, full = format_rand_short(cents), format_rand(cents)
-    return short if short == full else f"{short} ({full})"
+    return format_rand_prose(cents)
 
 
 def headline(con) -> dict:
