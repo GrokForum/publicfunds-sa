@@ -24,8 +24,8 @@ After each successful nightly publish, run the existing read-only live check so 
      --wait 600
    ```
 2. Put the script's `RESULT:` line and any `[BREACH]` / `[WARN]` lines in the nightly report.
-3. On BREACH (exit 3): report and stop. Do not re-publish to "fix" it. Follow RB-12.
-4. On WARN (exit 1): report; the rest of the routine may finish.
+3. On BREACH (exit 1, at least one `[BREACH]` line): report and stop. Do not re-publish to "fix" it. Follow RB-12.
+4. On WARN (exit 0 with `[WARN]` lines; exit 0 also means OK): report; the rest of the routine may finish. Exit 2 means a bad command line and nothing was checked: report it as a routine fault (correction in this refresh: the exit codes now match `scripts/check_live.py` and RB-12).
 5. Update CSI-036 from "nightly routine step needs a separate owner GO" to delivered once the implementation CHG merges.
 
 ## What stays
