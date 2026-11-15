@@ -72,7 +72,7 @@ The first reviewer passed the code and asked for a fresh head that covers every 
 1. Coverage-by-type "Present %" uses `pctPoints` (81.9 shows as 81.90%). The CSV still has the plain stored value.
 2. The table helper now shows a `num` column with a bare numeric `value` through `formatCount` (for example Awards, Present/Partial/Missing, hidden leads). The CSV path is unchanged. Other leftover counts (confirmed-flags heading, coverage row count, report-card flag and gap counts, "most common gap reason" count) use `intg`. Review-app templates format non-cents count columns and status/coverage counts through the `count` and `amount` filters. Years, dates, IDs, SHAs and versions stay unformatted.
 3. Stale second arguments such as `pct(share, 0)` are removed.
-4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). Related choices stay open.
+4. The change-log row and the `thusa/format.py` module note now state that the main rule is decided (owner decision, 13 Nov 2026 19:30 SAST). The related choices (Q4 and Q5) were answered by the owner on 14 Nov 2026 18:12 SAST and moved to CHG-2026-059.
 5. Optional: `format_amount(-0.0)` and any value that rounds to zero show `0.00`, never `-0.00`, with a test. The CHG-2026-056 change-log row, which still said the PR was not merged, now records the merge of PR #5 at 13 Nov 2026 19:16 SAST (merge 8cdf9ad6). That side fix is documentation only.
 
 ### Owner style follow-up (head 0893952b, replaces the rounding and padding above)
