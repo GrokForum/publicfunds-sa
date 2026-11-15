@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 import duckdb
 from jinja2 import Environment, select_autoescape
 
+from thusa.format import format_amount, format_count
+
 from thusa.review.service import Service, _csv_safe
 from thusa.review.store import SAST
 from thusa.settings import Paths, publication_config
@@ -31,16 +33,16 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 .lead{border-style:dashed;background:#fafbfc}.lbl{font-size:.78rem;font-weight:600;text-transform:uppercase;color:#5d6670}
 small{color:#5d6670}</style></head><body>
 <h1>Thusa: South African public-spending data - public snapshot</h1>
-<p class="banner">Generated {{ generated }} from build {{ build_id }}. Coverage: <b>{{ h.complete_pct }}%</b> of
-municipality-years have complete core data ({{ h.complete }} of {{ h.applicable }}; {{ h.entities }} municipalities).
+<p class="banner">Generated {{ generated }} from build {{ build_id }}. Coverage: <b>{{ amount(h.complete_pct, 1) }}%</b> of
+municipality-years have complete core data ({{ count(h.complete) }} of {{ count(h.applicable) }}; {{ count(h.entities) }} municipalities).
 Flags are automated indicators checked by people; a published flag means reviewers confirmed the data pattern is real,
 <b>not</b> that anyone acted unlawfully.</p>
-<h2>Confirmed flags ({{ confirmed|length }})</h2>
+<h2>Confirmed flags ({{ count(confirmed|length) }})</h2>
 {% for f in confirmed %}<div class="card"><div class="lbl">Confirmed by review · {{ f.detector_id.split('_')[0] }} · {{ f.severity }}</div>
 <b>{{ f.title }}</b><p>{{ f.explanation }}</p>{% if f.review_reason %}<p><small>Review note: {{ f.review_reason }}</small></p>{% endif %}
 <small>Confirmed {{ f.confirmed_at_sast }} · evidence: {% for u in f.evidence_urls %}<a href="{{ u }}" rel="nofollow noopener">source {{ loop.index }}</a> {% endfor %}</small></div>
 {% else %}<p>No flags have been confirmed by review yet.</p>{% endfor %}
-{% if leads %}<h2>Unreviewed leads ({{ leads|length }}) - not findings</h2>
+{% if leads %}<h2>Unreviewed leads ({{ count(leads|length) }}) - not findings</h2>
 <p><small>These automated indicators have not been confirmed by a reviewer. They may be data errors. Indicators that
 name a supplier or person are never shown here.</small></p>
 {% for f in leads %}<div class="card lead"><div class="lbl">Unreviewed lead · {{ f.detector_id.split('_')[0] }}</div>
@@ -95,6 +97,8 @@ def render_public(paths: Paths, policy: dict | None = None) -> dict:
         con.close()
     gen = datetime.now(timezone.utc).astimezone(SAST).strftime("%Y-%m-%d %H:%M SAST")
     env = Environment(autoescape=select_autoescape(default=True))
+    env.globals["amount"] = format_amount
+    env.globals["count"] = format_count
     (tmp / "index.html").write_text(env.from_string(PAGE).render(
         confirmed=confirmed, leads=leads, h=h, build_id=bid, generated=gen, policy=pol["unconfirmed"]),
         encoding="utf-8")
