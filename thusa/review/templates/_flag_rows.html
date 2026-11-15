@@ -1,5 +1,5 @@
 {% from "_status.html" import badge, sev %}
-<p class="muted">{{ total }} flag(s){% if pages > 1 %} · page {{ page }} of {{ pages }}{% endif %}</p>
+<p class="muted">{{ total|count }} flag(s){% if pages > 1 %} · page {{ page|count }} of {{ pages|count }}{% endif %}</p>
 <div class="table-wrap"><table class="queue">
 <thead><tr><th>Severity</th><th>Detector</th><th>Flag</th><th>Entity</th><th>Period</th><th>Status</th></tr></thead>
 <tbody>
