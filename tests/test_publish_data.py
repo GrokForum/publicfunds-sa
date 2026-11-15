@@ -176,6 +176,25 @@ def test_fuel_and_cpi_parsers():
     assert len(cpi) == 12 and cpi[0]["index_value"] == 150.1
 
 
+def test_fuel_history_number_strips_space_thousands():
+    """CHG-2026-056: a space, no-break space or narrow no-break space is a thousands separator."""
+    assert parsers._fuel_history_number("3 085.67") == 3085.67
+    assert parsers._fuel_history_number("3\u00a0085.67") == 3085.67
+    assert parsers._fuel_history_number("3\u202f085.67") == 3085.67
+    assert parsers._fuel_history_number("2 112.00") == 2112.00
+    assert parsers._fuel_history_number("2064.00") == 2064.00
+    assert parsers._fuel_history_number("1,234.50") == 1234.50  # comma thousands, unchanged
+
+
+def test_fuel_history_rows_accepts_space_thousands():
+    """CHG-2026-056: the DOCX history parser accepts '3 085.67' and the same value with Unicode spaces."""
+    for raw in ("3 085.67", "3\u00a0085.67", "3\u202f085.67"):
+        rows = parsers.fuel_history_rows(fuel_docx(months=(("Nov", raw),)), "t.docx")
+        assert len(rows) == 7
+        assert {r["cents_per_litre"] for r in rows} == {3085.67}
+        assert rows[0]["month"] == 11 and rows[0]["year"] == 2026
+
+
 def test_fuel_page_parser():
     from thusa.connectors.prices import fuel_documents
     html = ('<h4>Fuel Price Adjustment Documents – October 2026 (ZIP)</h4><a href="https://bit.ly/x">View</a>'

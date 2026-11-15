@@ -11,6 +11,8 @@ import re
 
 import duckdb
 
+from thusa.format import format_rand_prose
+
 MUNI_API = "https://municipaldata.treasury.gov.za/api/cubes"
 MUNI_PROFILE = "https://municipalmoney.gov.za/profiles/municipality-{code}/"
 OCDS_BULK = "https://data.open-contracting.org/en/publication/143"
@@ -22,6 +24,16 @@ def _id(*parts) -> str:
 
 
 def _rand(cents) -> str:
+    """A rand amount in a flag title or explanation (CHG-2026-059): the report's prose rule.
+
+    R1 m and over: short form with the full figure in brackets, "R1.2 m (R1,200,000.00)".
+    Under R1 m: the full figure with cents, "R123,456.78". None: "unknown".
+    """
+    return format_rand_prose(cents)
+
+
+def _rand_evidence(cents) -> str:
+    """The award 'value' string kept in evidence_json. Unchanged by CHG-2026-059: it is stored evidence."""
     return "unknown" if cents is None else f"R{cents / 100:,.0f}"
 
 
@@ -190,7 +202,7 @@ def d4_concentration(con, cfg: dict) -> list[dict]:
             "D4_supplier_concentration", cfg, "gov_body", r["gb"] or f"BUYER:{r['buyer_id']}", r["buyer_name"],
             r["gb"] or f"BUYER:{r['buyer_id']}", f"last {cfg['window_years']}y", "low", round(r["hhi"], 1),
             f"{r['buyer_name']}: award value highly concentrated (HHI {r['hhi']:,.0f}; top supplier {r['top_share']:.0%})",
-            f"Across {r['n_awards']} single-supplier awards with a known value ({_rand(r['total'])}) to "
+            f"Across {r['n_awards']} single-supplier awards with a known total value of {_rand(r['total'])} to "
             f"{r['n_suppliers']} supplier(s), the largest recipient ({r['top_supplier']}) received "
             f"{_rand(r['top_value'])}. Concentration can be legitimate (framework contracts, sole providers); "
             "multi-supplier awards and awards without values are excluded. Pending human review.",
@@ -385,7 +397,7 @@ def _windows(items, days):
 
 def _award_ev(items, extra=None):
     ev = [{"label": "eTenders OCDS award", "ocid": a["ocid"], "award_id": a["award_id"],
-           "value": _rand(a["value_cents"]), "date": str(a["award_date"]), "date_basis": a["award_date_basis"],
+           "value": _rand_evidence(a["value_cents"]), "date": str(a["award_date"]), "date_basis": a["award_date_basis"],
            "url": OCDS_BULK} for a in items]
     return ev + (extra or [])
 
@@ -408,7 +420,7 @@ def d16_repeat_awards(con, cfg: dict) -> list[dict]:
         out.append(_pair_flag(
             "D16_repeat_awards", cfg, best, "low", len(best),
             f"{a0['buyer_name']}: {len(best)} awards to {a0['supplier_name']} within {cfg['window_days']} days",
-            f"{len(best)} single-supplier awards with a known value ({_rand(total)} in total) from this buyer to this "
+            f"{len(best)} single-supplier awards with a known total value of {_rand(total)} from this buyer to this "
             f"supplier between {best[0]['award_date']} and {best[-1]['award_date']}. Repeat awards can be legitimate "
             "(framework or panel contracts, sole providers).", _award_ev(best)))
     return out
@@ -426,7 +438,7 @@ def d17_just_below_threshold(con, cfg: dict, thresholds: dict | None = None) -> 
         out.append(_pair_flag(
             "D17_just_below_threshold", cfg, best, "med" if len(best) >= 3 else "low", len(best),
             f"{a0['buyer_name']}: {len(best)} awards to {a0['supplier_name']} just under the {_rand(t)} bidding limit",
-            f"{len(best)} awards between {_rand(t * (1 - cfg['band']))} and {_rand(t)} within {cfg['window_days']} "
+            f"{len(best)} awards between {_rand(round(t * (1 - cfg['band'])))} and {_rand(t)} within {cfg['window_days']} "
             f"days. Above {_rand(t)} a {a0['body_type']} buyer must use competitive bidding ({regime.upper()} "
             "thresholds, config/detectors.yaml). Values near a limit are common and can be legitimate.",
             _award_ev(best)))
