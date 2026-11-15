@@ -13,11 +13,18 @@
 --   denominator_not_positive    : audited spending is zero or less
 --   denominator_incomplete_year : years ending 2018 and 2019. Audited spending at the source is summed from sparse line
 --                                 items and is incomplete for many municipalities (reviewer finding on 180154f7)
---   denominator_no_reference    : 2020-2024, but the municipality has no OTHER year 2020-2024 with audited spending > 0,
---                                 so the completeness check cannot run
---   denominator_incomplete      : 2020-2024, audited spending is under 50% of the median of the municipality's audited
---                                 spending in its OTHER years 2020-2024 (only years with spending > 0 count)
---   share_over_100              : fallback. The check above passed, but F&W is still larger than audited spending
+-- From 2020 the completeness check compares audited spending with a reference:
+--   * the median of the municipality's audited spending in its OTHER years 2020-2024 (only years with spending > 0
+--     count; one other year is enough), check basis 'other_years';
+--   * when there is no such year: that year's adjusted budget (curated.muni_total, amount_type 'ADJB',
+--     total_expenditure_cents; Municipal Money incexp_v2), if it is above zero, check basis 'adjusted_budget'.
+--   An adjusted budget that is missing, zero or less is treated as "no budget": it is never used as a reference.
+--   denominator_no_reference    : no other year and no adjusted budget above zero, so the check cannot run
+--   denominator_incomplete      : audited spending is under 50% of the reference (too LOW: probably incomplete)
+--   denominator_implausible_high: audited spending is over 2.5 times the reference, or (with other years as the
+--                                 reference) over 2.5 times that year's adjusted budget (too HIGH: the share would be
+--                                 understated; reviewer finding on 22de78d8)
+--   share_over_100              : fallback. The checks above passed, but F&W is still larger than audited spending
 CREATE OR REPLACE TABLE marts.fw_metric AS
 WITH fw AS (
   SELECT gov_body_id, fye, amount_cents AS fw_cents,
@@ -31,6 +38,10 @@ WITH fw AS (
   WHERE amount_type = 'AUDA' AND fye BETWEEN 2018 AND 2024
 ), k AS (
   SELECT gov_body_id, fye FROM fw UNION SELECT gov_body_id, fye FROM den
+), bud AS (
+  SELECT gov_body_id, fye, total_expenditure_cents AS budget_cents
+  FROM curated.muni_total
+  WHERE amount_type = 'ADJB' AND fye BETWEEN 2018 AND 2024
 ), ref AS (
   -- reference for each body-year: median audited spending over the body's OTHER years 2020-2024 with spending > 0
   SELECT k.gov_body_id, k.fye, count(o.denom_cents)::INTEGER AS denom_ref_years,
@@ -42,12 +53,20 @@ WITH fw AS (
   SELECT k.gov_body_id, g.name, g.province, g.body_type, k.fye,
          (k.fye - 1)::VARCHAR || '/' || right(k.fye::VARCHAR, 2) AS fy_label,
          fw.fw_cents, den.denom_cents, den.denom_derivation, ref.denom_ref_years, ref.denom_ref_median,
+         bud.budget_cents AS denom_budget_cents,
+         CASE WHEN k.fye < 2020 THEN NULL WHEN ref.denom_ref_years > 0 THEN 'other_years'
+              WHEN bud.budget_cents > 0 THEN 'adjusted_budget' END AS denom_check_basis,
          CASE WHEN fw.fw_cents IS NULL THEN 'fw_unknown'
               WHEN den.denom_cents IS NULL THEN 'denominator_unknown'
               WHEN den.denom_cents <= 0 THEN 'denominator_not_positive'
               WHEN k.fye < 2020 THEN 'denominator_incomplete_year'
-              WHEN ref.denom_ref_years = 0 THEN 'denominator_no_reference'
+              WHEN ref.denom_ref_years = 0 AND NOT coalesce(bud.budget_cents > 0, false) THEN 'denominator_no_reference'
+              WHEN ref.denom_ref_years = 0 AND den.denom_cents * 2 < bud.budget_cents THEN 'denominator_incomplete'
+              WHEN ref.denom_ref_years = 0 AND den.denom_cents * 2 > bud.budget_cents * 5 THEN 'denominator_implausible_high'
+              WHEN ref.denom_ref_years = 0 THEN 'ok'
               WHEN den.denom_cents * 2 < ref.denom_ref_median THEN 'denominator_incomplete'
+              WHEN den.denom_cents * 2 > ref.denom_ref_median * 5 THEN 'denominator_implausible_high'
+              WHEN bud.budget_cents > 0 AND den.denom_cents * 2 > bud.budget_cents * 5 THEN 'denominator_implausible_high'
               ELSE 'ok' END AS share_status,
          coalesce(fw.source_id, den.source_id) AS source_id,
          coalesce(fw.source_file, den.source_file) AS source_file,
@@ -60,6 +79,7 @@ WITH fw AS (
   JOIN ref ON ref.gov_body_id = k.gov_body_id AND ref.fye = k.fye
   LEFT JOIN fw ON fw.gov_body_id = k.gov_body_id AND fw.fye = k.fye
   LEFT JOIN den ON den.gov_body_id = k.gov_body_id AND den.fye = k.fye
+  LEFT JOIN bud ON bud.gov_body_id = k.gov_body_id AND bud.fye = k.fye
 ), s AS (
   SELECT j.*,
          CASE WHEN j.share_status = 'ok' THEN
@@ -75,6 +95,8 @@ SELECT s.gov_body_id, s.name, s.province, s.body_type, s.fye, s.fy_label,
        s.denom_derivation,
        s.denom_ref_years,
        s.denom_ref_median,            -- in cents; DECIMAL because a median of an even count can end in .5
+       s.denom_budget_cents::BIGINT AS denom_budget_cents,
+       s.denom_check_basis,
        CASE WHEN s.share_calc > 100 THEN 'share_over_100' ELSE s.share_status END AS share_status,
        CASE WHEN s.share_calc <= 100 THEN s.share_calc END::DECIMAL(18,4) AS fw_share_pct,
        p.fw_cents::BIGINT AS fw_prev_cents,

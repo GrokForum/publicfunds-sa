@@ -493,8 +493,9 @@ async function vMunicipality(id) {
 const FW_STATUS = {fw_unknown: "the F&W amount is not available", denominator_unknown: "audited spending is not available",
   denominator_not_positive: "audited spending is zero or less",
   denominator_incomplete_year: "audited spending for 2017/18 and 2018/19 is incomplete at the source for many municipalities",
-  denominator_no_reference: "there is no other year from 2019/20 to 2023/24 with audited spending to check this figure against",
-  denominator_incomplete: "audited spending is under half of this municipality's usual audited spending, so it is probably incomplete",
+  denominator_no_reference: "there is no other year from 2019/20 to 2023/24 with audited spending, and no adjusted budget, to check this figure against",
+  denominator_incomplete: "audited spending is under half of this municipality's usual audited spending (or of that year's adjusted budget), so it is probably incomplete",
+  denominator_implausible_high: "audited spending is more than 2.5 times this municipality's usual audited spending or that year's adjusted budget, so the share would be too low",
   share_over_100: "the F&W amount is larger than audited spending, so one of the two figures is probably incomplete"};
 const FW_NATIONAL_STATUS = {denominator_incomplete_year: "audited spending for this year is incomplete at the source for many municipalities",
   no_base: "no municipality has a share for this year"};
@@ -505,8 +506,8 @@ const FW_CAVEATS = [
   "Share of audited spending = the fruitless and wasteful amount divided by audited operating spending for the same municipality and year. Both figures come from the audited financial statements, through Municipal Money. We cut the share at four decimal places. We do not round it.",
   "Years shown: 2017/18 to 2023/24. Older years (2011/12 to 2016/17) are not shown yet, because we have not checked them by hand. 2024/25 is not yet available at the source.",
   "For 2017/18 and 2018/19 we show the amounts but no share. Audited spending for those two years is incomplete at the source for many municipalities, so a share would be wrong.",
-  "From 2019/20 to 2023/24 we check each year's audited spending against the same municipality's other years. If it is under half of the usual (median) figure, it is probably incomplete, and we do not show a share. We also do not show a share when there is no other year to compare with.",
-  "\"Not available\" means that a figure is missing, that audited spending is zero or less or failed the check above, or that the fruitless and wasteful amount is larger than audited spending. The CSV download gives the reason for each row. \"Not available\" is never zero.",
+  "From 2019/20 to 2023/24 we check each year's audited spending against the same municipality's other years (the usual, median figure). If there is no other year, we check it against that year's adjusted budget. We do not show a share when audited spending is under half of that figure (probably incomplete), or more than 2.5 times that figure or that year's adjusted budget (the share would be too low). We also do not show a share when there is nothing to compare with.",
+  "\"Not available\" means that a figure is missing, that audited spending is zero or less or failed the check above (too low or too high), or that the fruitless and wasteful amount is larger than audited spending. The CSV download gives the reason for each row. \"Not available\" is never zero.",
   "The source does not say if an amount is for that year only or a balance from earlier years. A municipality can also change an earlier year's figure in a later year's statements.",
   "The national figure is the sum of the amounts in the municipal financial statements. It is not the Auditor-General's national headline figure, which uses a different group of auditees.",
   "A large municipality can have a large amount but a small share. The list is in alphabetical order. It is not a ranking."];

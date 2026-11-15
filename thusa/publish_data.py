@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 
-from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, NATIONAL_STATUS, SHARE_STATUS
+from thusa.fw_metric import FW_FYE_MAX, FW_FYE_MIN, FW_REF_MAX_RATIO, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, NATIONAL_STATUS, SHARE_STATUS
 from thusa.settings import REPO_ROOT, Paths, load_yaml
 
 SAST = ZoneInfo("Africa/Johannesburg")
@@ -188,9 +188,11 @@ def municipalities(con, refs: SourceRefs) -> dict:
                       f"fw.share_pct: percentage points, cut (not rounded) to 4 decimal places; null unless fw.status is ok. "
                       f"No share before the year ending {FW_SHARE_FYE_MIN}: audited spending for 2017/18 and 2018/19 is "
                       "incomplete at the source for many municipalities.",
-                      f"Completeness check ({FW_SHARE_FYE_MIN}-{FW_FYE_MAX}): no share when audited spending is under "
-                      f"{FW_REF_MIN_RATIO:.0%} of the municipality's median audited spending in its other years "
-                      f"{FW_SHARE_FYE_MIN}-{FW_FYE_MAX}, or when there is no other year to compare with.",
+                      f"Completeness check ({FW_SHARE_FYE_MIN}-{FW_FYE_MAX}): the reference is the municipality's median "
+                      f"audited spending in its other years {FW_SHARE_FYE_MIN}-{FW_FYE_MAX}, or, when there is no other year, "
+                      "that year's adjusted budget (Municipal Money, adjusted budget, total expenditure). No share when audited spending is under "
+                      f"{FW_REF_MIN_RATIO:.0%} or over {FW_REF_MAX_RATIO:g} times the reference, when it is over "
+                      f"{FW_REF_MAX_RATIO:g} times that year's adjusted budget, or when there is no reference at all.",
                       "fw.status: " + "; ".join(f"{k} = {v}" for k, v in SHARE_STATUS.items()) + ".",
                       "fw.change: F&W amount minus the prior year's amount, in cents; null when either year is unknown.",
                       "fw_national: per year, fw = sum of all known municipal F&W amounts (hidden shares included); "

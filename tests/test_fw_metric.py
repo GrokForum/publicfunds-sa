@@ -17,8 +17,8 @@ import duckdb
 import pytest
 
 from thusa import dq
-from thusa.fw_metric import (FW_FYE_MAX, FW_FYE_MIN, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, GUARD_STATUS, NATIONAL_STATUS,
-                             SHARE_STATUS)
+from thusa.fw_metric import (FW_FYE_MAX, FW_FYE_MIN, FW_REF_MAX_RATIO, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, GUARD_STATUS, NATIONAL_STATUS,
+                             SHARE_STATUS, CHECK_BASIS)
 
 ROOT = Path(__file__).resolve().parents[1]
 SQL = ROOT / "thusa" / "models" / "marts" / "110_fw_metric.sql"
@@ -26,8 +26,9 @@ PAGE = (ROOT / "apps" / "public-dashboard" / "index.html").read_text(encoding="u
 SHA = "a" * 64
 
 
-def _wh(fw: list[tuple], den: list[tuple], bodies=("MUN:AAA", "MUN:BBB", "MUN:CCC")):
-    """fw rows: (gov_body_id, fye, amount_cents); den rows: (gov_body_id, fye, total_expenditure_cents)."""
+def _wh(fw: list[tuple], den: list[tuple], bodies=("MUN:AAA", "MUN:BBB", "MUN:CCC"), budget: list[tuple] = ()):
+    """fw rows: (gov_body_id, fye, amount_cents); den rows: (gov_body_id, fye, total_expenditure_cents);
+    budget rows: (gov_body_id, fye, adjusted budget total_expenditure_cents)."""
     con = duckdb.connect()
     for s in ("ops", "curated", "marts"):
         con.execute(f"CREATE SCHEMA {s}")
@@ -54,6 +55,9 @@ def _wh(fw: list[tuple], den: list[tuple], bodies=("MUN:AAA", "MUN:BBB", "MUN:CC
                     [b, y, c, SHA])
         con.execute("INSERT INTO curated.muni_total VALUES (?, ?, 'ORGB', 1, 'published_subtotal', 'muni_api', 'f', ?, now(), 'loc')",
                     [b, y, SHA])
+    for b, y, c in budget:
+        con.execute("INSERT INTO curated.muni_total VALUES (?, ?, 'ADJB', ?, 'sum_of_line_items', 'muni_api', 'f', ?, now(), 'loc')",
+                    [b, y, c, SHA])
     con.execute("CREATE TABLE curated.agsa_uifw (regime VARCHAR, uifw_type VARCHAR, audit_group VARCHAR, fye INTEGER, "
                 "amount_cents BIGINT, gov_body_id VARCHAR)")
     con.execute(SQL.read_text())
@@ -70,14 +74,16 @@ def _row(con, b, y):
 
 def test_sql_numbers_match_python_constants():
     sql = SQL.read_text()
-    assert sql.count(f"BETWEEN {FW_FYE_MIN} AND {FW_FYE_MAX}") == 2
+    assert sql.count(f"BETWEEN {FW_FYE_MIN} AND {FW_FYE_MAX}") == 3   # fw, den, bud
     assert f"o.fye BETWEEN {FW_SHARE_FYE_MIN} AND {FW_FYE_MAX}" in sql
     assert f"WHEN k.fye < {FW_SHARE_FYE_MIN} THEN 'denominator_incomplete_year'" in sql
     assert f"WHEN fye < {FW_SHARE_FYE_MIN} THEN 'denominator_incomplete_year'" in sql
     assert FW_REF_MIN_RATIO == 0.5 and "WHEN den.denom_cents * 2 < ref.denom_ref_median THEN 'denominator_incomplete'" in sql
+    assert FW_REF_MAX_RATIO == 2.5 and "WHEN den.denom_cents * 2 > ref.denom_ref_median * 5 THEN 'denominator_implausible_high'" in sql
+    assert "amount_type = 'ADJB'" in sql
     assert (FW_FYE_MIN, FW_SHARE_FYE_MIN, FW_FYE_MAX) == (2018, 2020, 2024)
     for st in re.findall(r"THEN '(\w+)'", sql):
-        assert st in SHARE_STATUS or st in NATIONAL_STATUS, st
+        assert st in SHARE_STATUS or st in NATIONAL_STATUS or st in CHECK_BASIS, st
     assert set(GUARD_STATUS) <= set(SHARE_STATUS)
 
 
@@ -159,6 +165,59 @@ def test_every_former_over_100_case_is_hidden():
     assert con.execute("SELECT count(*) FROM marts.fw_metric WHERE fw_share_pct > 100").fetchone()[0] == 0
 
 
+@pytest.mark.parametrize("dens,budget,year,status", [
+    ({2020: 100, 2021: 100, 2022: 250}, {}, 2022, "ok"),                                      # exactly 2.5x passes
+    ({2020: 100, 2021: 100, 2022: 251}, {}, 2022, "denominator_implausible_high"),            # over 2.5x the median
+    ({2022: 1_000, 2023: 1_070, 2024: 10_677}, {2024: 1_148}, 2024, "denominator_implausible_high"),   # Kagisano-Molopo-like
+    ({2020: 251, 2021: 251, 2022: 251}, {2022: 100}, 2022, "denominator_implausible_high"),  # over 2.5x the budget only
+    ({2020: 250, 2021: 250, 2022: 250}, {2022: 100}, 2022, "ok"),                            # exactly 2.5x the budget passes
+    ({2020: 100, 2021: 100, 2022: 100}, {2022: 0}, 2022, "ok"),                              # zero budget: not used
+    ({2020: 100, 2021: 100, 2022: 100}, {2022: -5}, 2022, "ok"),                             # negative budget: not used
+    ({2020: 100, 2021: 100, 2022: 100}, {}, 2022, "ok"),                                     # missing budget: not used
+    ({2020: 100, 2021: 100, 2022: 30}, {2022: 30}, 2022, "denominator_incomplete"),          # the low bound uses other years
+])
+def test_implausible_high_denominator(dens, budget, year, status):
+    con = _wh([("MUN:AAA", y, 1) for y in dens], [("MUN:AAA", y, c * 100_000) for y, c in dens.items()],
+              budget=[("MUN:AAA", y, c * 100_000) for y, c in budget.items()])
+    r = _row(con, "MUN:AAA", year)
+    assert r["status"] == status and (r["share"] is None) == (status != "ok")
+    basis = con.execute("SELECT denom_check_basis FROM marts.fw_metric WHERE fye = ?", [year]).fetchone()[0]
+    assert basis == "other_years"
+
+
+@pytest.mark.parametrize("den,budget,status,basis", [
+    (1_037, 1_000, "ok", "adjusted_budget"),                         # Kopanong-like: shown, checked against the budget
+    (500, 1_000, "ok", "adjusted_budget"),                           # exactly half of the budget passes
+    (499, 1_000, "denominator_incomplete", "adjusted_budget"),       # Masilonyana / Nala-like
+    (2_500, 1_000, "ok", "adjusted_budget"),
+    (2_501, 1_000, "denominator_implausible_high", "adjusted_budget"),
+    (1_000, 0, "denominator_no_reference", None),                    # zero budget: still no reference
+    (1_000, -1, "denominator_no_reference", None),
+    (1_000, None, "denominator_no_reference", None),                 # missing budget
+])
+def test_no_comparison_year_falls_back_to_the_adjusted_budget(den, budget, status, basis):
+    con = _wh([("MUN:AAA", 2024, 5)], [("MUN:AAA", 2024, den * 100_000), ("MUN:AAA", 2019, 9)],
+              budget=[] if budget is None else [("MUN:AAA", 2024, budget * 100_000)])
+    r = _row(con, "MUN:AAA", 2024)
+    assert r["status"] == status and (r["share"] is None) == (status != "ok")
+    assert con.execute("SELECT denom_check_basis FROM marts.fw_metric WHERE fye = 2024").fetchone()[0] == basis
+
+
+def test_budget_before_2020_is_not_used_and_basis_is_null():
+    con = _wh([("MUN:AAA", 2019, 5)], [("MUN:AAA", 2019, 100)], budget=[("MUN:AAA", 2019, 100)])
+    assert con.execute("SELECT share_status, denom_check_basis, denom_budget_cents FROM marts.fw_metric").fetchone() \
+        == ("denominator_incomplete_year", None, 100)
+
+
+def test_implausible_high_rows_are_out_of_the_national_share():
+    con = _wh([("MUN:AAA", 2024, 1_00), ("MUN:BBB", 2024, 50_00)],
+              [("MUN:AAA", 2024, 100_00), ("MUN:AAA", 2023, 100_00), ("MUN:BBB", 2024, 10_000_00), ("MUN:BBB", 2023, 100_00)])
+    assert _row(con, "MUN:BBB", 2024)["status"] == "denominator_implausible_high"
+    n = con.execute("SELECT fw_total_cents, fw_share_base_cents, denom_share_base_cents, n_share_hidden, national_share_pct "
+                    "FROM marts.fw_national WHERE fye = 2024").fetchone()
+    assert n == (51_00, 1_00, 100_00, 1, Decimal("1.0000"))
+
+
 def test_denominator_only_row_is_kept_with_fw_unknown():
     con = _wh([], [("MUN:BBB", 2021, 1_000_00)])
     r = _row(con, "MUN:BBB", 2021)
@@ -213,10 +272,12 @@ def _clean():
     """Every status at least once: incomplete year, no reference, incomplete, over 100, ok, unknowns, not positive."""
     return _wh([("MUN:AAA", 2019, 0), ("MUN:AAA", 2020, 3), ("MUN:AAA", 2021, 4), ("MUN:AAA", 2022, 1),
                 ("MUN:BBB", 2020, None), ("MUN:BBB", 2023, 5), ("MUN:CCC", 2020, 500), ("MUN:CCC", 2022, 1),
-                ("MUN:DDD", 2023, 1)],
+                ("MUN:DDD", 2023, 1), ("MUN:DDD", 2024, 1), ("MUN:EEE", 2023, 1), ("MUN:FFF", 2022, 1)],
                [("MUN:AAA", 2019, 50), ("MUN:AAA", 2020, 2_000_000), ("MUN:AAA", 2021, 2_000_000), ("MUN:AAA", 2022, 10),
                 ("MUN:BBB", 2020, 10), ("MUN:BBB", 2023, 0), ("MUN:CCC", 2020, 100), ("MUN:CCC", 2021, 100), ("MUN:CCC", 2024, 7),
-                ("MUN:DDD", 2023, 100)], bodies=("MUN:AAA", "MUN:BBB", "MUN:CCC", "MUN:DDD"))
+                ("MUN:DDD", 2023, 100), ("MUN:DDD", 2024, 1_000), ("MUN:EEE", 2023, 100), ("MUN:FFF", 2022, 100)],
+               bodies=("MUN:AAA", "MUN:BBB", "MUN:CCC", "MUN:DDD", "MUN:EEE", "MUN:FFF"),
+               budget=[("MUN:EEE", 2023, 90), ("MUN:AAA", 2020, 2_000_000)])
 
 
 def test_dq_checks_pass_on_a_clean_mart():
@@ -228,7 +289,7 @@ def test_dq_checks_pass_on_a_clean_mart():
     assert {k: v for k, v in res.items() if k not in info} == {k: 0 for k in res if k not in info}
     assert res["fw_share_guarded_info"] == con.execute(
         "SELECT count(*) FROM marts.fw_metric WHERE fye >= 2020 AND share_status IN "
-        "('denominator_no_reference', 'denominator_incomplete', 'share_over_100')").fetchone()[0] > 0
+        "('denominator_no_reference', 'denominator_incomplete', 'denominator_implausible_high', 'share_over_100')").fetchone()[0] > 0
     sev = {n: s for n, s, _ in dq.fw_checks()}
     assert sev["fw_share_guarded_info"] == "warn" and sev["fw_agsa_reconcile_info"] == "warn"
     assert all(s == "error" for n, s in sev.items() if not n.endswith("_info"))
@@ -271,6 +332,9 @@ def test_agsa_check_reports_the_real_mismatch_count():
      "fw_completeness_rule"),
     ("UPDATE marts.fw_metric SET denom_ref_median = denom_ref_median + 1 WHERE denom_ref_median IS NOT NULL",
      "fw_reference_recomputed"),
+    ("UPDATE marts.fw_metric SET denom_budget_cents = 1 WHERE fye = 2020", "fw_budget_matches_source"),
+    ("UPDATE marts.fw_metric SET denom_check_basis = 'adjusted_budget' WHERE fye = 2020", "fw_completeness_rule"),
+    ("UPDATE marts.fw_metric SET denom_check_basis = 'other_years' WHERE fye = 2019", "fw_check_basis_only_from_2020"),
 ])
 def test_dq_checks_catch_a_broken_mart(tamper, check):
     con = _wh([("MUN:AAA", 2019, 2), ("MUN:AAA", 2020, 3), ("MUN:AAA", 2021, 4), ("MUN:AAA", 2022, 1)],
@@ -414,5 +478,6 @@ def test_page_explains_every_hidden_share_reason():
     nat = blk[blk.index("const FW_NATIONAL_STATUS"):blk.index("const FW_NOT_THEFT")]
     assert set(re.findall(r"\b(\w+): \"", nat)) == set(NATIONAL_STATUS) - {"ok"}
     assert "For 2017/18 and 2018/19 we show the amounts but no share." in blk
-    assert "under half of the usual (median) figure" in blk and "no other year to compare with" in blk
+    assert "under half of that figure" in blk and "more than 2.5 times that figure or that year's adjusted budget" in blk
+    assert "against that year's adjusted budget" in blk and "nothing to compare with" in blk
     assert "left out of both parts of the share" in blk

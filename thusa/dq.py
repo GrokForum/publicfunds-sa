@@ -126,12 +126,14 @@ def checks(min_rows: dict | None = None) -> list[tuple[str, str, str]]:
 
 def fw_checks() -> list[tuple[str, str, str]]:
     """CHG-2026-062 Phase 1: checks for marts.fw_metric and marts.fw_national (F&W share of audited spending)."""
-    from thusa.fw_metric import (FW_FYE_MAX, FW_FYE_MIN, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN, GUARD_STATUS,
-                                 NATIONAL_STATUS, SHARE_STATUS)
+    from thusa.fw_metric import (FW_FYE_MAX, FW_FYE_MIN, FW_REF_MAX_RATIO, FW_REF_MIN_RATIO, FW_SHARE_FYE_MIN,
+                                 GUARD_STATUS, NATIONAL_STATUS, SHARE_STATUS)
     statuses = ",".join(f"'{s}'" for s in SHARE_STATUS)
     guards = ",".join(f"'{s}'" for s in GUARD_STATUS)
     nat_statuses = ",".join(f"'{s}'" for s in NATIONAL_STATUS)
     inv = int(round(1 / FW_REF_MIN_RATIO))      # 0.5 -> 2: "denominator x 2 < median", exact integer arithmetic
+    hi_n, hi_d = 5, 2                           # 2.5 = 5/2: "denominator x 2 > reference x 5", exact integer arithmetic
+    assert hi_n / hi_d == FW_REF_MAX_RATIO
     fw_src = ("FROM curated.uifw_line u JOIN curated.gov_body g ON g.gov_body_id = u.gov_body_id AND g.sphere = 'local' "
               f"WHERE u.uifw_type = 'fruitless_wasteful' AND u.measure = 'reported' AND u.fye BETWEEN {FW_FYE_MIN} AND {FW_FYE_MAX}")
     both = f"fw_cents IS NOT NULL AND denom_cents > 0"
@@ -165,14 +167,27 @@ def fw_checks() -> list[tuple[str, str, str]]:
          f"ON o.gov_body_id = a.gov_body_id AND o.fye <> a.fye AND o.fye BETWEEN {FW_SHARE_FYE_MIN} AND {FW_FYE_MAX} "
          "AND o.denom_cents > 0 GROUP BY a.gov_body_id, a.fye) r USING (gov_body_id, fye) "
          "WHERE m.denom_ref_years IS DISTINCT FROM r.n OR m.denom_ref_median IS DISTINCT FROM r.med"),
-        # completeness rule for 2020-2024 rows with both figures: no reference -> no_reference; under half of the
-        # median -> incomplete; otherwise ok or (fallback) share_over_100
+        # the stored adjusted budget is the warehouse's ADJB total expenditure for the same body and year
+        ("fw_budget_matches_source", "error",
+         "SELECT count(*) FROM marts.fw_metric m LEFT JOIN curated.muni_total b ON b.gov_body_id = m.gov_body_id "
+         "AND b.fye = m.fye AND b.amount_type = 'ADJB' WHERE m.denom_budget_cents IS DISTINCT FROM b.total_expenditure_cents"),
+        # completeness rule for 2020-2024 rows with both figures (low and high bounds, other years or budget fallback)
         ("fw_completeness_rule", "error",
-         f"SELECT count(*) FROM marts.fw_metric WHERE fye >= {FW_SHARE_FYE_MIN} AND {both} AND share_status IS DISTINCT FROM "
-         "CASE WHEN denom_ref_years = 0 THEN 'denominator_no_reference' "
-         f"WHEN denom_cents * {inv} < denom_ref_median THEN 'denominator_incomplete' "
+         f"SELECT count(*) FROM marts.fw_metric WHERE fye >= {FW_SHARE_FYE_MIN} AND {both} AND ("
+         "share_status IS DISTINCT FROM CASE "
+         "WHEN denom_ref_years = 0 AND NOT coalesce(denom_budget_cents > 0, false) THEN 'denominator_no_reference' "
+         f"WHEN denom_ref_years = 0 AND denom_cents * {inv} < denom_budget_cents THEN 'denominator_incomplete' "
+         f"WHEN denom_ref_years = 0 AND denom_cents * {hi_d} > denom_budget_cents * {hi_n} THEN 'denominator_implausible_high' "
+         f"WHEN denom_ref_years > 0 AND denom_cents * {inv} < denom_ref_median THEN 'denominator_incomplete' "
+         f"WHEN denom_ref_years > 0 AND denom_cents * {hi_d} > denom_ref_median * {hi_n} THEN 'denominator_implausible_high' "
+         f"WHEN denom_ref_years > 0 AND denom_budget_cents > 0 AND denom_cents * {hi_d} > denom_budget_cents * {hi_n} "
+         "THEN 'denominator_implausible_high' "
          "WHEN fw_cents > 0 AND (fw_cents::HUGEINT * 1000000) // denom_cents::HUGEINT > 1000000 THEN 'share_over_100' "
-         "ELSE 'ok' END"),
+         "ELSE 'ok' END "
+         "OR denom_check_basis IS DISTINCT FROM CASE WHEN denom_ref_years > 0 THEN 'other_years' "
+         "WHEN denom_budget_cents > 0 THEN 'adjusted_budget' END)"),
+        ("fw_check_basis_only_from_2020", "error",
+         f"SELECT count(*) FROM marts.fw_metric WHERE fye < {FW_SHARE_FYE_MIN} AND denom_check_basis IS NOT NULL"),
         # cut, not rounded: 0 <= fw x 10^6 - share x 10^4 x denom < denom (exact integer arithmetic). A very small
         # non-zero amount can cut to 0.0000; the page then shows "under 0.0001%", never 0%.
         ("fw_share_matches_inputs", "error",
