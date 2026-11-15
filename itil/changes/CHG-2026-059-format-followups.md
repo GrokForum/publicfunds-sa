@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | The owner, 14 Nov 2026 18:12 SAST, as relayed to the author (PublicFunds). The owner answered Q4 and Q5, which CHG-2026-057 left open: use the conventional standard, the one that is most readable for a wide audience, the same as for the other numbers. This is approval to prepare the RFC and PR only. It is not a merge GO. |
-| Status | Open PR, not merged. Needs two independent reviewer PASSes on the exact head, then an owner merge GO that names this head. |
+| Status | Implemented / closed. Merged 15 Nov 2026 17:56 SAST as `fc965467` (PR #8, exact head `c6cea973edd144ba534e32218c3b7090266b547e`, tag `snapshot-2026-11-15-1756`). Owner GO as reported to the author (PublicFunds). Exact words are in the private approval record. Post-merge checks, the local rebuild and the flag-text counts are in Result and in CHG-2026-060. |
 | Type | **Normal-medium**, the same as CHG-2026-057. The change alters display text only. It does not change detector thresholds or logic, which flags are made, `config/publication.yaml`, or the publishing pipeline. It does change the text that the review fingerprint covers (see "Effect on stored flags and reviews"). |
-| Environment | DEV only (branch `feat/chg-2026-059-format-followups` from origin/main at `1c6ecda9`). Nothing pushed to main. No publish. |
+| Environment | Merged and live on `main`. Merged 15 Nov 2026 17:56 SAST as `fc965467` (PR #8, exact head `c6cea973`, tag `snapshot-2026-11-15-1756`); owner GO as reported to the author (PublicFunds). GitHub Pages build `1372205926` was `built` for that commit (17:56:03–17:56:22 SAST). `scripts/check_live.py` exited 0 at 17:57 SAST; live public data remains the 15 Nov nightly, B20261115T011932Z (generated 03:20 SAST). A local `uv run thusa run` (no publish) then rewrote stored flag text as warehouse build B20261115T155921Z; recorded by CHG-2026-060. |
 | CIs affected | `thusa/format.py` (new `format_rand_prose`); `thusa/report.py` (`rand_short` uses it); `thusa/detectors.py` (`_rand`, new `_rand_evidence`, two wording edits); `thusa/review/warehouse.py` (`share_of_top15`, new `share_pct_1dp`); `tests/test_format_followups_059.py` (new); `tests/test_number_format.py` (one guard line); this record; `itil/registers/change-log.md` |
 | Linked records | CHG-2026-057 (Q4, Q5) |
 | Rollback | Close the PR unmerged. If merged: `git revert -m 1 <merge commit>`. The next build then makes the old text again. Git is the rollback; no .bkp files. |
@@ -106,4 +106,4 @@ The diff, this record, the change-log row and the PR description were scanned fo
 
 ## Result
 
-DEV: tests succeeded on this branch. PR open, not merged. No publish and no PROD change.
+Merged: PR #8 at exact head `c6cea973` as merge commit `fc965467`, 15 Nov 2026 17:56 SAST, tag `snapshot-2026-11-15-1756`. Owner GO as reported to the author (PublicFunds). GitHub Pages build `1372205926` was `built`; `check_live` exited 0 at 17:57 SAST. Live public data remains the 15 Nov nightly (B20261115T011932Z). This close-out did not publish. A local rebuild (B20261115T155921Z) rewrote 325 of 349 flag explanations; 0 titles changed; 0 review decisions. Full facts are in CHG-2026-060.
