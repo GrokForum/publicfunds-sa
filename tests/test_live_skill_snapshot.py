@@ -120,7 +120,7 @@ MASTER_EDITS = (
      "The publish script prints one line starting `evidence_guard:`."),                                     # 4
     ("# PublicFunds refresh\n\n", "# PublicFunds refresh\n\n" + INTRO),                                       # 5
     ("Do not retry and do not edit data. Report to the owner at once:",
-     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused` and put these first:"),  # 6
+     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused`. If the guard line is `BLOCKED`, put `ACTION: publish needs attention` on the next line (refused first, then needs attention). Then give first:"),  # 6
     ("   - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.\n",
      "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Stop after the wrapper and report. Do not retry.\n"
      "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
@@ -214,6 +214,7 @@ def test_routine_file_names_the_publish_script_once():
 def test_routine_prompt_matches_the_master():
     prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
     assert "ACTION: publish refused" in prompt
+    assert "if both apply, `ACTION: publish refused` comes first, then `ACTION: publish needs attention`" in prompt
     assert "publicfunds-refresh skill" in prompt and "steps 0 to 6" in prompt
     assert "This is the nightly run" in prompt and "the nightly-run path" in prompt
     assert "Step 4 of the skill is the only publish of the night" in prompt
@@ -223,6 +224,14 @@ def test_routine_prompt_matches_the_master():
     # The prompt itself never gives a publish command line to run.
     assert "> data/publish-run.log" not in prompt and "echo $?" not in prompt
     assert "/home/box" not in prompt
+
+
+def test_action_line_order_on_a_refused_publish():
+    """Publish exit 3 with evidence_guard BLOCKED: `ACTION: publish refused` first, then `ACTION: publish needs attention`."""
+    t = MASTER.read_text(encoding="utf-8")
+    line = next(l for l in t.splitlines() if "If the publish script exits **3**" in l)
+    assert line.index("`ACTION: publish refused`") < line.index("`ACTION: publish needs attention`")
+    assert "(refused first, then needs attention)" in line
 
 
 def test_live_skill_has_not_drifted():
