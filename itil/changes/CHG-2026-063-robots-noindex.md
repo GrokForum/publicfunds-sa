@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Owner instruction to hide the site from search engines, 17 Nov 2026, as reported to the author (PublicFunds). The rule: public watcher sites use a robots.txt with `User-agent: *` and `Disallow: /` until a later combined watcher site exists. This record is not a merge GO. |
-| Status | **Implemented / merged.** Merged 17 Nov 2026 11:29:14 SAST as `de37f666` (PR #12, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129`; pre-change tag `snapshot-2026-11-17-pre-chg063` on `7cb9faf`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews (0 review records, no review decision). Recorded by CHG-2026-061. |
+| Status | **Implemented / merged.** Merged 17 Nov 2026 11:29:14 SAST as `de37f666` (PR #12, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129`; pre-change tag `snapshot-2026-11-17-pre-chg063` on `7cb9faf`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. On GitHub, PR #12 shows no review records (0 reviews, no review decision). The reviews were done outside GitHub, as reported to the author (PublicFunds): one reviewer PASS, then a second reviewer PASS_WITH_CONCERNS. CHG-2026-064 follows up the concerns. |
 | Type | **Normal-high** (`itil/change-enablement.md`: hosting / distribution). The change sets what search engines may crawl and index on the live site. It does not change data, detectors, flags or the publish code. |
 | Environment | Merged and live (PROD, GitHub Pages from `main`). Built in DEV first. Pre-change `main` is `7cb9faf53a989f0625c78abd9e24c7e98e4710a3` (the 17 Nov 2026 nightly data commit, B20261117T012014Z). After a merge, GitHub Pages serves the change from `main`, folder `/`. |
 | CIs affected | New CI-117 (`robots.txt`, noindex meta tag); CI-111 (Pages site root); CI-105 (`apps/public-dashboard/index.html`); root `index.html`; `thusa/review/templates/base.html`; CI-109 (`scripts/dashboard_check.py`); new `tests/test_robots_noindex.py`; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
@@ -94,11 +94,11 @@ Conclusion: the nightly publish cannot overwrite or delete `robots.txt` or remov
 | Role | Name | Commit approved | Date |
 |---|---|---|---|
 | Change authority | owner | owner instruction as reported to the author (PublicFunds); merged by the orchestrator at exact head `3c93c88d` | 17 Nov 2026 |
-| Reviewer 1 | reviewer | none shown on PR #12 | |
-| Reviewer 2 | reviewer | none shown on PR #12 | |
+| Reviewer 1 | reviewer | PASS, given outside GitHub, as reported to the author (PublicFunds); none shown on PR #12 | 17 Nov 2026 |
+| Reviewer 2 | reviewer | PASS_WITH_CONCERNS, given outside GitHub, as reported to the author (PublicFunds); none shown on PR #12; follow-up in CHG-2026-064 | 17 Nov 2026 |
 
 ## Post-implementation review
 
 - Outcome: Successful. After the merge, 17 Nov 2026 11:30 SAST: `https://publicfunds.grokforum.site/robots.txt` gave HTTP 200 with the exact two lines; `https://grokforum.github.io/publicfunds-sa/robots.txt` gave HTTP 301 to that URL, then the same HTTP 200 and content; the live `/` and `/apps/public-dashboard/` each had the `noindex, nofollow` meta tag once. `scripts/check_live.py --expect-local public-data/v1/manifest.json --raw-url <raw manifest on main>` from a clean worktree at `de37f666`, 11:30 SAST: RESULT OK, exit 0 (build B20261117T012014Z).
-- Process note: the PR shows no reviews. This record states that fact only.
+- Process note: On GitHub, PR #12 shows no review records (0 reviews, no review decision). The reviews were done outside GitHub, as reported to the author (PublicFunds): one reviewer PASS, then a second reviewer PASS_WITH_CONCERNS. CHG-2026-064 follows up the concerns.
 - Follow-up for the owner: optional search engine removal requests (see above).
