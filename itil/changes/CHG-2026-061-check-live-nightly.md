@@ -2,12 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | Follow-on to CSI-036, CHG-2026-032 and the CHG-2026-053 RFC (PR #2, merged 15 Nov 2026). RFC drafted 15 Nov 2026. Repo part built 17 Nov 2026 on a local branch (owner GO for the CHG-061 build and the PR #11 fold, 17 Nov 2026, as reported to the author (PublicFunds)). This record is not a merge GO. |
-| Status | RFC merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST, exact head `84590a20`). **Implementation, repo part only: built on the local branch `chg-2026-061-nightly-check-live` from `main` `eebb4c44` (17 Nov 2026). Not pushed. No PR.** The live skill, the repo skill copy and the nightly routine prompt are **not** changed. See "Implementation (repo part)". |
-| Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline / distribution). The repo part (wrapper script, tests, records) is implemented on a local branch and waits for two reviewer PASSes and the owner's GO naming the exact head. The nightly routine and the skill are not changed; that later step needs its own owner GO. |
-| Environment | DEV: local branch `chg-2026-061-nightly-check-live`, pre-change `main` `eebb4c44c82e47da2d8879e2af6b61287ed6cd68` (the RFC was written on `8b4f72b8`, tag `snapshot-2026-11-15-1817`). Not pushed; nothing published. The later step (routine prompt and live skill on the bot computer, and the repo skill copy) is not done. |
+| Requested by / date (SAST) | Follow-on to CSI-036, CHG-2026-032 and the CHG-2026-053 RFC (PR #2, merged 15 Nov 2026). RFC drafted 15 Nov 2026. Repo part built 17 Nov 2026 on branch `chg-2026-061-nightly-check-live` (owner GO for the CHG-061 build and the PR #11 fold, 17 Nov 2026, as reported to the author (PublicFunds)). This record is not a merge GO. |
+| Status | RFC merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST, exact head `84590a20`). **Implementation, repo part only: built on branch `chg-2026-061-nightly-check-live` from `main` `eebb4c44` (17 Nov 2026); draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`.** This change does **not** change the live skill, the template skill copy or the nightly routine prompt. It adds a snapshot of the live skill and the proposed step as a marked draft (`docs/bot/live-skill/`). See "Implementation (repo part)" and "Follow-up (owner decisions)". |
+| Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline / distribution). The repo part (wrapper script, tests, records, live-skill snapshot and draft) is on branch `chg-2026-061-nightly-check-live`. A merge needs two reviewer PASSes and the owner's GO naming the exact head. Changing the nightly routine and the live skill is a later step with its own owner GO. |
+| Environment | DEV: branch `chg-2026-061-nightly-check-live` (draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`), pre-change `main` `eebb4c44c82e47da2d8879e2af6b61287ed6cd68` (the RFC was written on `8b4f72b8`, tag `snapshot-2026-11-15-1817`); `main` `de37f666` merged in on 17 Nov 2026. This change publishes nothing. The routine prompt and the live skill on the bot computer are outside git and are not changed by this change. |
 | CIs affected (this RFC) | `itil/changes/CHG-2026-061-check-live-nightly.md`, `itil/registers/change-log.md` |
-| CIs affected (repo part, this branch) | New `scripts/nightly_check_live.py` and `tests/test_nightly_check_live.py` (CI-116); this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
+| CIs affected (repo part, this branch) | New `scripts/nightly_check_live.py` and `tests/test_nightly_check_live.py` (CI-116); new `docs/bot/live-skill/` (live skill snapshot of 17 Nov 2026, the proposed step as a marked draft, README) and `tests/test_live_skill_snapshot.py`; this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
 | CIs affected (later step, after the owner GO) | Live refresh skill; repo copy `docs/bot/skills/publicfunds-refresh/SKILL.md`; the nightly routine prompt; `itil/registers/csi-register.md` (CSI-036 status) |
 | Linked records | CHG-2026-032 (script and RB-12), CHG-2026-053 (RFC draft, open PR #2), CSI-036, SLO-PD-1, RB-12, D-08 (still open; out of scope) |
 | Rollback | For this docs change: close it unmerged, or `git revert -m 1 <merge commit>` if it is later merged. Git is the rollback; no `.bkp` files. The later implementation rollback and the BREACH kill switch are quoted below, reused from CHG-2026-032, CHG-2026-053, RB-12 and CSI-036. |
@@ -168,7 +168,7 @@ Two points need a decision before that step:
 
 ### Rollback
 
-- Before a merge: delete the local branch. Nothing was pushed.
+- Before a merge: close draft PR #13 unmerged and delete the branch.
 - After a merge: `git revert -m 1 <merge commit>`. Nothing else in the repo calls the wrapper. `scripts/check_live.py` stays. Git is the rollback; no `.bkp` files.
 - Kill switch (CHG-2026-032 and RB-12): to turn the nightly step off, remove the added routine and skill text (write back the previous text). On a BREACH: report it as a breach, do not re-publish, follow RB-12.
 
@@ -181,7 +181,7 @@ See "Result". Live behaviour is not tested here: the RFC's scratch dry run after
 - KE-001 (`itil/knowledge/known-errors.md`): the "page 3" update was out of date. It now says that every eTenders OCDS run from 19 Oct to 17 Nov 2026 (39 runs in `data/raw/runs.jsonl`) was `partial`, each with HTTP 500 after 5 attempts on one delta page, and that the page changes (page 1 to page 7; page 5 on 12, 14, 15 and 16 Nov; page 4 on 17 Nov). The follow-up note said page 5; the run log shows that the page changes, so the text gives the range. KE-001 is in the published manifest, so the new text goes live with the first nightly after a merge.
 - CSI-009 (`itil/registers/csi-register.md`) and the CHG-2026-044 row in `itil/registers/change-log.md` and its Result line: they said "PR open, not merged". CHG-2026-044 was merged in the old private repository on 31 Oct 2026 19:39 SAST and is in the public tree since CHG-2026-051. The restore-check log on the box shows PASS on 1 Nov (two runs), 8 Nov and 15 Nov 2026. CSI-009 now says this. Closing CSI-009 is left to the owner.
 - CHG-2026-060 Rollback (`itil/changes/CHG-2026-060-close-059.md`, two places): "Close the PR unmerged" changed to the revert of the real merge `8b4f72b8`.
-- `STATUS.md` Current: brought up to 17 Nov 2026 (merges of PR #1 to #4 and #10, open draft PR #11, this local branch, current live data build).
+- `STATUS.md` Current: brought up to 17 Nov 2026 (merges of PR #1 to #4 and #10, draft PR #11, this branch, current live data build).
 - The change-log rows for CHG-2026-052 to CHG-2026-055 and CHG-2026-061 said "Open PR, not merged". They now give the merges. This also records those merges (no separate records PR).
 
 ## Not changed
@@ -278,14 +278,30 @@ Docs-only RFC wording. No SA ID, passport, phone, email, address, account number
 
 RFC: merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST). The approval for that merge is not in the author's records **[unverified]**.
 
-Repo part (17 Nov 2026, local branch `chg-2026-061-nightly-check-live`, not pushed):
+Repo part (17 Nov 2026, branch `chg-2026-061-nightly-check-live`; draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`):
 
 - `uv run pytest -q tests/test_nightly_check_live.py`: **42 passed** (fix commit after review; first commit: 27).
 - `uv run pytest -q` (worktree, no warehouse), fix commit: **907 passed, 61 skipped, 0 failed** (first commit `e92d149d`: 892 passed, 61 skipped; baseline on `eebb4c44`: 865 passed, 61 skipped). This includes `tests/test_no_owner_quotes.py` and `tests/test_popia_names.py`, run again after the commit so that the new files are tracked.
 - No real publish, push or live check was run. `scripts/publish-public-data.sh` was not run.
-- Status: **built, not reviewed.** Needs two independent reviewer PASSes on the exact head and the owner's own GO naming that head before a push or merge. The routine and skill change needs its own owner GO after that.
+- Merge rule: two independent reviewer PASSes on the exact head and the owner's own GO naming that head. The routine and live skill change is a later step with its own owner GO (see "Follow-up (owner decisions)").
 
 ## Records carried in this branch
 
 - 17 Nov 2026: `origin/main` `de37f666` merged into this branch (merge only, no rebase). It brings in CHG-2026-063 (PR #12) and the 17 Nov 2026 nightly data commit `7cb9faf`. Conflicts in `itil/registers/change-log.md` and `itil/registers/ci-register.md` were resolved by keeping both sides (CHG-2026-061 row from this branch, CHG-2026-063 row from `main`; CI-116 and CI-117).
 - This branch records the CHG-2026-063 merge: PR #12, merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129`. Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Updated: the CHG-2026-063 record (status, environment, approval, outcome), its change-log row, CI-117 and `STATUS.md`.
+
+## Review of head `72d84812` and this commit
+
+A reviewer gave PASS_WITH_CONCERNS on `72d84812` (outside GitHub, as reported to the author (PublicFunds)), with two findings. This commit answers both:
+
+1. **The record, `STATUS.md` and the change-log described the branch as not pushed and with no PR.** They now state that draft PR #13 was opened on 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`. Things still to do are in "Follow-up (owner decisions)" below.
+2. **The live skill was not in the head.** `docs/bot/live-skill/publicfunds-refresh.LIVE-2026-11-17.md` is a byte-for-byte copy of the live `publicfunds-refresh` skill of 17 Nov 2026 (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`). `docs/bot/live-skill/publicfunds-refresh.PROPOSED-CHG-2026-061.md` is the same text with the proposed step added as a marked draft (step 4; later steps renumbered). `tests/test_live_skill_snapshot.py` checks that the draft differs from the snapshot only by that step. The live skill, the template skill copy (`docs/bot/skills/publicfunds-refresh/SKILL.md`) and the nightly routine prompt are not changed. POPIA scan of the copied text: PASS (no names, accounts, contact details or personal paths; only the repo path, the local review-app address and role words).
+
+## Follow-up (owner decisions)
+
+These items are outside this change. Each one needs the owner's own decision or GO:
+
+1. Apply the draft step (`docs/bot/live-skill/publicfunds-refresh.PROPOSED-CHG-2026-061.md`, step 4) to the live skill and the nightly routine prompt.
+2. Choose the source of truth for the refresh skill (the live skill or the template copy) and bring the other copy in line.
+3. Decide if the routine always uses `--push` and never pushes by hand ("Push detection").
+4. After item 1: update CSI-036 for the nightly step and refresh the live-skill snapshot in the repo. D-08 stays open.

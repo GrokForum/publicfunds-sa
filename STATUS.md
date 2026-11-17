@@ -14,10 +14,9 @@
   - CHG-2026-060 (PR #9, records only): merge `8b4f72b8`, 15 Nov 2026 18:17 SAST, exact head `0243d3ed`, tag `snapshot-2026-11-15-1817`. GitHub Pages build `1372254306` was built; `check_live` OK at 20:06 SAST. Docs only; no publish. The close-out of this record is in PR #1 (CHG-2026-052).
   - CHG-2026-052 to CHG-2026-055 (PR #1 to #4, docs only) and the CHG-2026-061 RFC (PR #10, docs only): merged 15 Nov 2026 21:25 to 21:26 SAST at the exact heads `549ed172`, `5e0bfb7f`, `2098adbd`, `cb3313c1` and `84590a20` (merges `9e9f62d6`, `c32c5814`, `c3ce8204`, `8193911e`, `ceabf997`). One tag for all five: `snapshot-2026-11-15-pr1-4-10`. The approvals for these merges are not in the author's records **[unverified]**. Recorded by CHG-2026-061.
 - INC-2026-004 is closed (14 Nov 2026) after the 14 Nov nightly succeeded. INC-2026-001 and INC-2026-002 remain mitigated (KE-001, KE-002). INC-2026-003 is still recorded as open.
-- Open PRs on GrokForum/publicfunds-sa:
-  - #11 (draft, CHG-2026-062, fruitless and wasteful expenditure metric, Phase 1, municipalities). Main `eebb4c44` is merged into it on a new local head that is not pushed. Needs reviews and an owner GO on the exact head.
-- Local branches, not pushed:
-  - `chg-2026-061-nightly-check-live` (CHG-2026-061 repo part: `scripts/nightly_check_live.py`, tests, docs follow-ups). Needs two reviewer PASSes and an owner GO on the exact head. The nightly routine and the skill are not changed; that needs a separate owner GO.
+- Draft PRs opened on GrokForum/publicfunds-sa (each merge is recorded in its own change record):
+  - #11 (CHG-2026-062, fruitless and wasteful expenditure metric, Phase 1, municipalities): opened 16 Nov 2026 01:43 SAST; on 17 Nov 2026 its branch was updated to `4321bfca` (`main` `de37f666` merged in).
+  - #13 (CHG-2026-061 repo part: `scripts/nightly_check_live.py`, tests, docs follow-ups, live-skill snapshot and marked draft step): opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`. The nightly routine and the live skill are not changed by this change; that is a follow-up with its own owner GO.
 - Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate (17 Nov 2026 nightly): 58 pass, 1 warn, 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
 - Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
 
