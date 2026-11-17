@@ -573,6 +573,8 @@ def main() -> int:
                 h1 = page.locator("#view h1").inner_text()
                 if h1 in ("Something went wrong", "Page not found", "Municipality not found", "Department not found"):
                     problems.append(f"{vname} {name}: {h1}: {page.locator('#view').inner_text()[:300]}")
+                if name == "home" and page.locator('meta[name="robots"]').get_attribute("content") != "noindex, nofollow":
+                    problems.append(f"{vname} home: robots meta tag is not 'noindex, nofollow' (CHG-2026-063)")
                 if AXE_JS:
                     page.add_script_tag(content=AXE_JS.read_text())
                     res = page.evaluate("""() => axe.run(document, {runOnly: {type: 'tag', values: ['wcag2a','wcag2aa','wcag21a','wcag21aa']}})
