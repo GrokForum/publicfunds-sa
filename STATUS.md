@@ -19,6 +19,7 @@
   - #13 (CHG-2026-061 repo part: `scripts/nightly_check_live.py`, tests, docs follow-ups, live-skill snapshot and marked draft step): opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`. The nightly routine and the live skill are not changed by this change; that is a follow-up with its own owner GO.
 - Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate (17 Nov 2026 nightly): 58 pass, 1 warn, 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
 - Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
+- CHG-2026-065 (owner decisions of 17 Nov 2026, as reported to the author (PublicFunds)): the repo copy `docs/bot/live-skill/publicfunds-refresh.MASTER.md` is the master of the live refresh skill; step 4 publishes with `--push` only if step 1 returned 0, then runs the live check. The routine prompt text that goes with it is `docs/bot/live-skill/routine-nightly.PROPOSED.md`. The orchestrator deploys both together after the merge.
 
 ## History (as of 2026-10-23)
 

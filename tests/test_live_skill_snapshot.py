@@ -8,12 +8,23 @@ later step changes:
 - new step 4 (marked DRAFT): the exact text in STEP4_HEAD, the moved bullets, then the exact text in STEP4_TAIL;
 - the health check becomes step 5 and "Never confirm or reject" becomes step 6.
 Neither file is a template skill (see tests/test_bot_skills.py).
+
+CHG-2026-065: the master copy of the live skill (publicfunds-refresh.MASTER.md) is the draft made final, and the
+routine prompt (routine-nightly.PROPOSED.md) goes with it. The dated snapshot stays byte-exact to its own sha256.
 """
+import hashlib
 from pathlib import Path
+
+import pytest
 
 D = Path(__file__).resolve().parent.parent / "docs" / "bot" / "live-skill"
 LIVE = D / "publicfunds-refresh.LIVE-2026-11-17.md"
 DRAFT = D / "publicfunds-refresh.PROPOSED-CHG-2026-061.md"
+MASTER = D / "publicfunds-refresh.MASTER.md"
+ROUTINE = D / "routine-nightly.PROPOSED.md"
+LIVE_SHA256 = "aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b"
+LIVE_PATH = Path("/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md")
+PUBLISH_CMD = "`cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`"
 
 COMMENT = ("<!-- DRAFT (CHG-2026-061). NOT APPLIED. This is the live skill text of 17 Nov 2026 with the proposed CHG-2026-061 step added.\n"
            "     The live skill and the nightly routine prompt change only after the owner's own GO for that step,\n"
@@ -57,7 +68,7 @@ def draft_matches(text: str) -> bool:
 
 
 def test_files_exist_and_are_not_template_skills():
-    assert LIVE.is_file() and DRAFT.is_file()
+    assert LIVE.is_file() and DRAFT.is_file() and MASTER.is_file() and ROUTINE.is_file()
     assert not list(D.glob("*/SKILL.md")) and not (D / "SKILL.md").exists()
 
 
@@ -78,3 +89,103 @@ def test_extra_text_in_the_draft_fails():
         assert bad != good
         assert not draft_matches(bad)
     assert not draft_matches(good.replace("Only if step 1 returned **0**: ", "", 1))      # a dropped condition fails too
+
+
+# CHG-2026-065: master copy of the live skill, the routine prompt, and the drift check.
+
+# The exact edits that make the CHG-2026-061 draft final. No other change is allowed.
+MASTER_EDITS = (
+    (COMMENT, ""),
+    ("4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.\n",
+     "4. Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.\n"),
+    ("   This step replaces the publish in the nightly routine prompt. The routine prompt must not publish again (one publish per night).\n",
+     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n"),
+    ("   Read data/publish-run.log for the evidence_guard line and the publish result. Do not push by hand.\n",
+     "   Always use `--push`. Do not push by hand. Read data/publish-run.log for the evidence_guard line and the publish result.\n"),
+    ("When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`.",
+     "The publish script prints one line starting `evidence_guard:`."),
+)
+
+
+def expected_master(draft: str) -> str:
+    for old, new in MASTER_EDITS:
+        assert draft.count(old) == 1, old
+        draft = draft.replace(old, new)
+    return draft
+
+
+def master_structure_ok(text: str) -> bool:
+    """Publish only in step 4, with --push, behind the step-1 gate; publish wording only after the publish command."""
+    lines = text.splitlines()
+    try:
+        s4 = next(i for i, l in enumerate(lines) if l.startswith("4. "))
+        cmd = next(i for i, l in enumerate(lines) if l.strip() == PUBLISH_CMD)
+        s5 = next(i for i, l in enumerate(lines) if l.startswith("5. Check `curl"))
+    except StopIteration:
+        return False
+    before = "\n".join(lines[:s4])
+    step4 = "\n".join(lines[s4:s5])
+    return (lines[s4].startswith("4. Only if step 1 returned **0**: publish")
+            and s4 < cmd < s5
+            and text.count("publish-public-data.sh") == 1
+            and "--push" in lines[cmd]
+            and all(w not in before for w in ("publish-public-data.sh", "evidence_guard", "--push", "nightly_check_live"))
+            and all(w not in "\n".join(lines[s4:cmd]) for w in ("evidence_guard", "exits **3**", "nightly_check_live"))
+            and "nightly_check_live.py" in step4
+            and "DRAFT" not in text
+            and lines[0] == "---"
+            and any(l == "name: publicfunds-refresh" for l in lines[:3])
+            and "6. Never confirm" in text)
+
+
+def test_live_snapshot_is_byte_exact_to_its_sha256():
+    assert hashlib.sha256(LIVE.read_bytes()).hexdigest() == LIVE_SHA256
+
+
+def test_master_is_the_draft_made_final():
+    assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
+
+
+def test_master_structure():
+    assert master_structure_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_master_structure_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    assert master_structure_ok(good)
+    bads = (
+        good.replace("publish-public-data.sh --push >", "publish-public-data.sh >", 1),            # no --push
+        good.replace("4. Only if step 1 returned **0**: publish", "4. Publish", 1),                  # gate dropped
+        good.replace("3. Report briefly", "3. Run `scripts/publish-public-data.sh --push`. Report briefly", 1),  # publish before step 4
+        good.replace("3. Report briefly", "3. Read the evidence_guard line. Report briefly", 1),      # publish wording before step 4
+        good.replace("6. Never confirm", "6. **[DRAFT]** Never confirm", 1),                          # draft marker left in
+    )
+    for bad in bads:
+        assert bad != good
+        assert not master_structure_ok(bad)
+
+
+def routine_prompt(text: str) -> str:
+    begin, end = "<!-- BEGIN ROUTINE PROMPT -->\n", "<!-- END ROUTINE PROMPT -->\n"
+    assert text.count(begin) == 1 and text.count(end) == 1
+    return text.split(begin, 1)[1].split(end, 1)[0]
+
+
+def test_routine_prompt_matches_the_master():
+    prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
+    assert "publicfunds-refresh skill" in prompt and "steps 0 to 6" in prompt
+    assert "Step 4 of the skill is the only publish of the night" in prompt
+    assert "only if step 1 returned 0" in prompt and "Always use `--push`" in prompt
+    assert "Do not run the publish script at any other point" in prompt
+    assert "Do not push by hand" in prompt
+    # The prompt itself never gives a publish command line to run.
+    assert "> data/publish-run.log" not in prompt and "echo $?" not in prompt
+    assert "/home/box" not in prompt
+
+
+def test_live_skill_has_not_drifted():
+    """Drift check: the live skill is the master (after deploy) or the 17 Nov 2026 snapshot (before deploy)."""
+    if not LIVE_PATH.is_file():
+        pytest.skip("live skill path is not on this computer")
+    live = LIVE_PATH.read_bytes()
+    assert live in (MASTER.read_bytes(), LIVE.read_bytes()), "live skill differs from the master and the snapshot"
