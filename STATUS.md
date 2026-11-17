@@ -2,6 +2,7 @@
 
 ## Current (15 Nov 2026)
 
+- 17 Nov 2026, DEV: CHG-2026-063 (hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag) is built on local branch `chg-2026-063-robots-noindex` from `7cb9faf`. Not pushed. It needs two reviewer PASSes and an owner GO that names the exact head. Rollback: delete the branch, or after a merge `git revert -m 1 <merge commit>`.
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
 - Live data build: B20261115T011932Z, generated 15 Nov 2026 03:20 SAST, `code_commit` `1c6ecda` (the 15 Nov 2026 nightly). After the PR #9 merge, `scripts/check_live.py` exited 0 at 20:06 SAST; the published data is still that nightly.
 - PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change (see `changes/CAB-DECISION.md`). Owner GO by role and date; exact words are in the private approval record.
