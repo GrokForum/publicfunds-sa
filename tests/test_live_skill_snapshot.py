@@ -13,6 +13,9 @@ CHG-2026-065: the master copy of the live skill (publicfunds-refresh.MASTER.md) 
 routine prompt (routine-nightly.PROPOSED.md) goes with it. The dated snapshot stays byte-exact to its own sha256.
 """
 import hashlib
+import os
+import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -135,14 +138,94 @@ MASTER_EDITS = (
      "   - 3: skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push).\n"
      "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n"),  # 9
 )
+# CHG-2026-066: duties of the nightly routine prompt of 17 Nov 2026 moved into the master. The master is now the
+# CHG-2026-061 draft with the 9 CHG-2026-065 edits (MASTER_EDITS) and then these CHG-2026-066 edits (CHG066_EDITS),
+# applied in that order to the text that the CHG-2026-065 edits give. No other change is allowed.
+GUARD_CMD = ("`cd /workspace/publicfunds && export GH_TOKEN=\"$(gh auth token --user GrokForum)\" && [ -n \"$GH_TOKEN\" ] "
+             "&& gh auth setup-git && git remote get-url origin | grep -Eq 'github\\.com[:/]GrokForum/publicfunds-sa(\\.git)?$'; echo $?`")
+WAIT_CMD = "`pgrep -f '[t]husa run' > /dev/null && echo running || echo none`"
+CANDIDATE_CMD = ("`cd /workspace/publicfunds && rm -rf data/popia-candidate && mkdir -p data/popia-candidate "
+                 "&& cp -a public-data/v1 data/popia-candidate/v1 && uv run pf publish-data --out data/popia-candidate/v1 "
+                 "> data/popia-candidate.json 2> data/popia-candidate.log; echo $?`")
+INCIDENT = "Record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local` (never pushed; see \"Incidents\")."
+NIGHTLY_SKIPPED = "ACTION: nightly skipped (another run still in progress after 2h)"
+NOT_ON_MAIN = "ACTION: publish blocked (not on main)"
+CHECKOUT_FAILED = "ACTION: checkout update failed"
+POPIA_DIFF_CMD = "`cd /workspace/publicfunds && git diff --no-index --no-color public-data/v1 data/popia-candidate/v1 > data/popia-candidate.diff; echo $?`."
+PUBLISH_DATA_LINES = "Quote the last 5 lines of `data/publish-data.log` and of `data/publish-data.json` in the report (as on exit 3)."
+INCIDENT_WT_CMD = ("`cd /workspace/publicfunds && git worktree prune && { [ -d /workspace/publicfunds-incidents ] "
+                   "|| git worktree add -q /workspace/publicfunds-incidents incidents/local 2>/dev/null "
+                   "|| git worktree add -q -b incidents/local /workspace/publicfunds-incidents main; }; echo $?`")
+INCIDENT_COMMIT_CMD = ("`cd /workspace/publicfunds-incidents && [ \"$(git rev-parse --abbrev-ref HEAD)\" = incidents/local ] "
+                       "&& git add -- itil/ && git commit -q -m \"<incident id>: <short title>\"; echo $?`")
+INCIDENTS_BLOCK = (
+    "**Incidents** (CHG-2026-066). An incident record is committed only on the local branch `incidents/local`, in its own worktree `/workspace/publicfunds-incidents`, never on `main`. The branch `incidents/local` is never pushed. The main checkout `/workspace/publicfunds` stays on `main` for the whole run and never switches branches, so every pull and the publish run on `main`. Run exactly:\n"
+    "   a. " + INCIDENT_WT_CMD + "\n"
+    "   b. Write the incident record (**publicfunds-itil**) under `/workspace/publicfunds-incidents/itil/`, not under `/workspace/publicfunds/itil/`.\n"
+    "   c. " + INCIDENT_COMMIT_CMD + "\n"
+    "   d. Never run `git push` in `/workspace/publicfunds-incidents`. If a command above exits non-zero, do not force, stash, reset or delete anything; put the incident text in the report instead.\n\n")
+STEP0_NEW = (
+    "0. Before any git pull or push (CHG-2026-066), in this order:\n"
+    "   - **Wait for any other pipeline run.** Run " + WAIT_CMD + ". If it prints `running`, another `thusa run` is in progress on this computer: do not start a second run. Check again every 60 s, for up to 120 minutes. If it still prints `running` after 120 minutes, begin the report with exactly `" + NIGHTLY_SKIPPED + "`, record an incident (see \"Incidents\"), and do nothing else: no pull, no publish, no push; skip steps 1 to 6.\n"
+    "   - **Account and origin guard.** Run exactly: " + GUARD_CMD + "\n"
+    "     Every git pull and push in this run goes out as the GrokForum GitHub account, never as any other GitHub account (the computer's active `gh` account can change). Keep `GH_TOKEN` exported for the whole run. If a later command runs in a new shell, run this guard again before any git pull or push. A non-zero exit means **stop and report**: begin the report with `ACTION: account or origin check failed`, skip steps 1 to 6, and do not pull, publish or push.\n"
+    "   Then update the checkout (CHG-2026-025). Run exactly: ")
+STEP4_SCOPE_AND_CHECKS = (
+    "   The push of `public-data/` to `main` of GrokForum/publicfunds-sa by this step is the standing pre-approved change (owner approval of 23 Oct 2026, recorded in `changes/CAB-DECISION.md`; the repo moved to GrokForum on 1 Nov 2026). It covers this data refresh only and updates the live dashboard. Never push anything else and never merge PRs.\n"
+    "   Before the publish command, in this order (CHG-2026-066):\n"
+    "   - **On main.** Run `git -C /workspace/publicfunds rev-parse --abbrev-ref HEAD`. If it does not print `main`, do not publish and do not switch branches; begin the report with `" + NOT_ON_MAIN + "`; skip the rest of this step. The publish script commits on the current branch before it checks the branch, so a publish off `main` would leave a data commit on the wrong branch.\n"
+    "   - **Account and origin guard again.** Run the step 0 guard command. A non-zero exit: do not publish; begin the report with `ACTION: account or origin check failed`; skip the rest of this step.\n"
+    "   - **POPIA release check.** Make the candidate public data without touching `public-data/`: " + CANDIDATE_CMD + "\n"
+    "     If that exits 0, write the full diff to a file: " + POPIA_DIFF_CMD + " Exit 0 (no change) or 1 (changes) is normal; any other exit means the check cannot run, so treat it as BLOCK (`ACTION: publish blocked (POPIA)`, reason: release check could not run). Read every line of `data/popia-candidate.diff`, in parts if it is large (each JSON file is one long line, so a changed file shows in full). Use the **popia-review** skill's release check (copy at `/home/box/shared-laws/popia-review-SKILL.md` if the skill cannot be loaded): no ID, phone or account numbers, no emails, no addresses and no names of private persons.\n"
+    "     - PASS: go on to the publish command.\n"
+    "     - BLOCK: do not publish. Begin the report with `ACTION: publish blocked (POPIA)`. Say what kind of item was found and in which file, never the personal data itself. Skip the rest of this step.\n"
+    "     - The candidate export exits 3 (export refused, nothing written): skip the release check and go on to the publish command. It refuses in the same way, and the publish rules below report it.\n"
+    "     - The candidate export exits with any other non-zero code: the check cannot run, so treat it as BLOCK (`ACTION: publish blocked (POPIA)`, reason: release check could not run; quote the last 5 lines of `data/popia-candidate.log`).\n"
+    "     For a blocked publish, `" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` is the only publish ACTION line; the publish exit code rules below do not apply, because the publish did not run.\n")
+BACKUP_BLOCK = (
+    "   **Back up state** (CHG-2026-044 appendix A, CHG-2026-066). Do this only if step 1 returned 0 and the publish exited 0. Do it after the live check, also when the wrapper said stop (the backup does not publish).\n"
+    "   `cd /workspace/publicfunds && scripts/backup-state.sh > data/backup-run.log 2>&1; echo $?`\n"
+    "   - 0: put the `backup: ok` line in the report. It adds no ACTION line.\n"
+    "   - Any other exit code: add `ACTION: backup failed` to the report, after any publish ACTION line, and quote the `backup: FAILED` line. Do not retry. Do not delete any backup. The routine prompt also tells the orchestrator agent (the failed line only, no data).\n"
+    "   - Backups stay on this computer only. Never commit, push or publish them.\n")
+CHG066_EDITS = (
+    ("(see step 4).\n\n",
+     "(see step 4). On the nightly run, the routine prompt decides whether the report is sent (it sends nothing when all is well).\n\n" + INCIDENTS_BLOCK),  # A
+    ("0. Update the checkout first (CHG-2026-025). Run exactly: ", STEP0_NEW),                                          # B
+    ("   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01.\n",
+     "   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01. " + INCIDENT + "\n"),  # C
+    ("   - otherwise draft an incident with **publicfunds-itil**.\n",
+     "   - otherwise (a source fails in a new way) record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local` (never pushed; see \"Incidents\").\n"),  # D
+    ("   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n",
+     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n" + STEP4_SCOPE_AND_CHECKS),  # E
+    ("(failed first, then needs attention). Stop after the wrapper and report. Do not retry.\n",
+     "(failed first, then needs attention). " + PUBLISH_DATA_LINES + " " + INCIDENT + " Stop after the wrapper and report. Do not retry.\n"),  # F
+    ("(failed first, then needs attention). Stop and report, and check by hand if new data went live. Do not retry.\n",
+     "(failed first, then needs attention). " + PUBLISH_DATA_LINES + " " + INCIDENT + " Stop and report, and check by hand if new data went live. Do not retry.\n"),  # G
+    ("   - 0: OK, or WARN only. Report any [WARN] lines. The rest of the routine may finish.\n",
+     "   - 0: OK, or WARN only. The live manifest shows the new build (the check_live `local.build` line). Report any [WARN] lines. The rest of the routine may finish.\n"),  # H
+    ("     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n",
+     "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n" + BACKUP_BLOCK),  # I
+    ("6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction.",
+     "6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction. Never push anything except the step 4 publish of `public-data/`, and never merge PRs."),  # J
+    ("index.lock) means **stop and report**: skip steps 1 to 6",
+     "index.lock) means **stop and report**: begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), skip steps 1 to 6"),  # K
+)
+
+
+def apply_edits(text: str, edits) -> str:
+    for old, new in edits:
+        assert text.count(old) == 1, old
+        text = text.replace(old, new)
+    return text
+
+
 ON_REQUEST = "On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**."
 
 
 def expected_master(draft: str) -> str:
-    for old, new in MASTER_EDITS:
-        assert draft.count(old) == 1, old
-        draft = draft.replace(old, new)
-    return draft
+    """The CHG-2026-065 edits, then the CHG-2026-066 edits."""
+    return apply_edits(apply_edits(draft, MASTER_EDITS), CHG066_EDITS)
 
 
 def master_structure_ok(text: str) -> bool:
@@ -174,7 +257,7 @@ def test_live_snapshot_is_byte_exact_to_its_sha256():
 
 
 def test_master_is_the_draft_made_final():
-    assert len(MASTER_EDITS) == 9
+    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 11
     assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
 
 
@@ -211,8 +294,8 @@ def routine_file_ok(text: str) -> bool:
 def test_routine_file_names_the_publish_script_once():
     good = ROUTINE.read_text(encoding="utf-8")
     assert routine_file_ok(good)
-    bad = good.replace("- Never confirm or reject flags.\n",
-                       "- Never confirm or reject flags.\n- Then run `scripts/publish-public-data.sh --push`.\n", 1)
+    bad = good.replace("- If step 0 or step 1 says stop,",
+                       "- Then run `scripts/publish-public-data.sh --push`.\n- If step 0 or step 1 says stop,", 1)
     assert bad != good and not routine_file_ok(bad)                      # a second publish line fails
 
 
@@ -377,9 +460,9 @@ def test_wording_without_publish_failed_fails():
     good = MASTER.read_text(encoding="utf-8")
     bads = (
         # the old exit 4 wording: no ACTION line on exit 4 with a bare pass
-        good.replace("exits 3. " + FAILED_BULLET + " Stop after the wrapper", "exits 3. Stop after the wrapper", 1),
+        good.replace("exits 3. " + FAILED_BULLET + " " + PUBLISH_DATA_LINES, "exits 3. " + PUBLISH_DATA_LINES, 1),
         # the old other-exit wording
-        good.replace("exits 2. " + FAILED_BULLET + " Stop and report", "exits 2. Stop and report", 1),
+        good.replace("exits 2. " + FAILED_BULLET + " " + PUBLISH_DATA_LINES, "exits 2. " + PUBLISH_DATA_LINES, 1),
         # order swapped on exit 4: needs attention before failed
         good.replace("exits 3. " + FAILED_BULLET,
                      "exits 3. Begin the report with `ACTION: publish needs attention`. If the guard line is not a bare pass, put "
@@ -417,3 +500,358 @@ def test_skip_rule_removed_fails():
     master, routine = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
     assert not skip_rule_ok(master.replace("   " + SKIP_RULE + "\n", "", 1), routine)      # removed from the master
     assert not skip_rule_ok(master, routine.replace(" " + SKIP_RULE, "", 1))               # removed from the routine prompt
+
+
+# CHG-2026-066: duty coverage. Duty names and a marker string only; the prompt that was live on 17 Nov 2026 is kept
+# outside git and is never copied here. Each marker must be in the file named (M = master skill, R = routine prompt).
+DUTIES = (
+    ("wait for any other pipeline run", "M", "pgrep -f '[t]husa run'"),
+    ("pull the latest main", "M", "git merge --ff-only origin/main"),
+    ("run the pipeline", "M", "uv run thusa run"),
+    ("publish only if the data-quality gate passed", "M", "Only if step 1 returned **0**: publish"),
+    ("POPIA release check before the publish", "M", "**POPIA release check.**"),
+    ("POPIA skill fallback copy", "M", "/home/box/shared-laws/popia-review-SKILL.md"),
+    ("POPIA BLOCK: no publish, no personal data in the report", "M", "never the personal data itself"),
+    ("publish with --push", "M", "scripts/publish-public-data.sh --push >"),
+    ("GrokForum token for every pull and push", "M", "gh auth token --user GrokForum"),
+    ("gh auth setup-git", "M", "gh auth setup-git"),
+    ("never another GitHub account", "R", "never as any other GitHub account"),
+    ("origin check before the push", "M", "**Account and origin guard again.**"),
+    ("standing pre-approved change, public-data only", "M", "is the standing pre-approved change"),
+    ("standing pre-approved change, in the routine", "R", "is the standing pre-approved change"),
+    ("never push anything else, never merge PRs", "M", "Never push anything else and never merge PRs."),
+    ("never merge PRs, in the routine", "R", "never merge PRs"),
+    ("never confirm or reject flags", "M", "Never confirm or reject flags"),
+    ("incident on a failed gate, on the local incidents branch", "M", "follow runbook RB-01. Record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local`"),
+    ("incidents only on incidents/local, never on main, never pushed", "M", "never on `main`. The branch `incidents/local` is never pushed."),
+    ("main checkout stays on main before any pull or publish", "M", "stays on `main` for the whole run and never switches branches"),
+    ("main check before the publish", "M", "**On main.**"),
+    ("wait cap of 2 hours", "M", "Check again every 60 s, for up to 120 minutes."),
+    ("nightly skipped after 2 hours: ACTION line", "M", "`ACTION: nightly skipped (another run still in progress after 2h)`"),
+    ("nightly skipped: no pull, no publish, no push", "M", "do nothing else: no pull, no publish, no push"),
+    ("nightly skipped in the quiet rule", "R", "a nightly skipped because another run was still in progress after 2 hours"),
+    ("incident on a new source failure", "M", "(a source fails in a new way) record an incident"),
+    ("incident on a failed push", "M", "(as on exit 3). Record an incident"),
+    ("review-app health check and restart", "M", "scripts/review-app.sh restart"),
+    ("live manifest shows the new build", "M", "The live manifest shows the new build"),
+    ("evidence guard line", "M", "**Publish guard line"),
+    ("refused export: no retry, no data edit", "M", "Do not retry and do not edit data."),
+    ("missing or UNKNOWN guard line is never a pass", "M", "Never describe an `UNKNOWN` or missing guard line as a pass."),
+    ("backup only if build and publish returned 0", "M", "Do this only if step 1 returned 0 and the publish exited 0."),
+    ("backup ok line", "M", "put the `backup: ok` line in the report"),
+    ("ACTION: backup failed", "M", "add `ACTION: backup failed` to the report"),
+    ("backup: no retry, no delete", "M", "Do not delete any backup."),
+    ("backups never committed or pushed", "M", "Never commit, push or publish them."),
+    ("tell the orchestrator agent on a backup failure", "R", "to the orchestrator agent with SendToAgent, priority true"),
+    ("quiet rule: send nothing when all is well", "R", "Otherwise send nothing"),
+    ("new high-severity flags in the report", "R", "new high-severity flags (give counts and the top few, marked as unreviewed)"),
+    ("HTTPS or manifest failure in the report", "R", "an HTTPS or manifest failure on the live site"),
+)
+
+
+def duties_missing(master: str, routine: str) -> list[str]:
+    return [name for name, where, marker in DUTIES if marker not in (master if where == "M" else routine)]
+
+
+def test_every_duty_is_covered():
+    assert duties_missing(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")) == []
+
+
+def test_a_removed_duty_fails():
+    master, routine = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    for name, where, marker in DUTIES:
+        m = master.replace(marker, "") if where == "M" else master
+        r = routine.replace(marker, "") if where == "R" else routine
+        assert name in duties_missing(m, r)
+
+
+def order_ok(master: str) -> bool:
+    """Account guard before the first pull; guard again and POPIA check before the push; backup after the live check."""
+    i = master.find
+    guard0, fetch = i("**Account and origin guard.**"), i("git fetch -q origin")
+    on_main, guard4 = i("**On main.**"), i("**Account and origin guard again.**")
+    popia, cmd = i("**POPIA release check.**"), i(PUBLISH_CMD)
+    wrapper, backup = i(WRAPPER_CMD), i("**Back up state**")
+    return (master.count(PUBLISH_CMD) == 1 and min(guard0, fetch, on_main, guard4, popia, cmd, wrapper, backup) >= 0
+            and guard0 < fetch < on_main < guard4 < popia < cmd < wrapper < backup)
+
+
+def test_order_of_guard_check_publish_and_backup():
+    assert order_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_order_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    bads = (
+        good.replace("**Account and origin guard.**", "", 1),                       # no guard before the first pull
+        good.replace("**Account and origin guard again.**", "", 1),                 # no origin check before the push
+        good.replace("**POPIA release check.**", "", 1),                            # no POPIA check before the push
+        good.replace("**Back up state**", "", 1),                                   # no backup step
+        good.replace("**On main.**", "", 1),                                        # no main check before the publish
+        good.replace("   `cd /workspace/publicfunds && scripts/backup-state.sh",   # backup moved before the publish
+                     "   `cd /workspace/publicfunds && scripts/backup-state.sh", 1).replace(
+            "   Before the publish command, in this order (CHG-2026-066):\n",
+            "   **Back up state** first.\n   Before the publish command, in this order (CHG-2026-066):\n", 1).replace(
+            "   **Back up state** (CHG-2026-044", "   Backup (CHG-2026-044", 1),
+        good + "\n" + PUBLISH_CMD + "\n",                                          # a second publish command
+    )
+    for bad in bads:
+        assert bad != good
+        assert not order_ok(bad)
+
+
+def quiet_rule_ok(routine: str) -> bool:
+    prompt = routine_prompt(routine)
+    return ("send a report with SendToUser only when it has an ACTION line or there is a failure" in prompt
+            and "Otherwise send nothing" in prompt and "send one report" not in prompt.lower())
+
+
+def test_quiet_rule():
+    assert quiet_rule_ok(ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_quiet_rule_check_catches_bad_text():
+    good = ROUTINE.read_text(encoding="utf-8")
+    for bad in (good.replace("Otherwise send nothing", "Then send it", 1),
+                good.replace("When you send a report, put in it:", "At the end, send one report with SendToUser. Put in it:", 1)):
+        assert bad != good
+        assert not quiet_rule_ok(bad)
+
+
+def test_no_agent_id_or_other_account_in_committed_text():
+    import re
+    uuid = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    for f in (MASTER, ROUTINE, D / "README.md"):
+        t = f.read_text(encoding="utf-8")
+        assert not uuid.search(t), f
+    assert "<orchestrator agent id from the private deploy notes>" in routine_prompt(ROUTINE.read_text(encoding="utf-8"))
+
+
+# CHG-2026-066 follow-up: incidents only on `incidents/local`, the 2-hour wait cap, the main check before the publish.
+
+def incidents_ok(master: str, routine: str) -> bool:
+    prompt = routine_prompt(routine)
+    old = ("commit it locally", "(no push)", "committed locally")
+    return (INCIDENTS_BLOCK in master and master.count(INCIDENT) == 3
+            and "never on `main`" in master and "`incidents/local` is never pushed" in master
+            and "never switches branches, so every pull and the publish run on `main`" in master
+            and "push" not in INCIDENT_WT_CMD + INCIDENT_COMMIT_CMD
+            and master.find(INCIDENTS_BLOCK) < master.find("\n0. ")
+            and "only on the local branch `incidents/local`" in prompt and "that branch is never pushed" in prompt
+            and not any(o in master or o in prompt for o in old))
+
+
+def test_incidents_go_only_to_the_local_incidents_branch():
+    assert incidents_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_incidents_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace(INCIDENT, "Record an incident with **publicfunds-itil** and commit it locally (no push).", 1), r),
+        (m.replace("never on `main`. ", "", 1), r),                                  # main no longer excluded
+        (m.replace("`incidents/local` is never pushed", "`incidents/local` is pushed", 1), r),
+        (m.replace(INCIDENTS_BLOCK, "", 1), r),                                      # no command sequence
+        (m.replace(" and never switches branches, so every pull and the publish run on `main`", "", 1), r),
+        (m, r.replace("that branch is never pushed", "push that branch", 1)),
+        (m, r.replace("only on the local branch `incidents/local`", "on `main`", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not incidents_ok(bm, br)
+
+
+def wait_cap_ok(master: str, routine: str) -> bool:
+    s0 = master[master.find("\n0. "):master.find("\n1. ")]
+    prompt = routine_prompt(routine)
+    order = prompt[prompt.find("- the ACTION lines first"):]
+    return (WAIT_CMD in s0 and "Check again every 60 s, for up to 120 minutes." in s0
+            and "If it still prints `running` after 120 minutes, begin the report with exactly `" + NIGHTLY_SKIPPED + "`" in s0
+            and "record an incident (see \"Incidents\")" in s0
+            and "do nothing else: no pull, no publish, no push; skip steps 1 to 6." in s0
+            and "wait for it to end" not in s0
+            and s0.find(NIGHTLY_SKIPPED) < s0.find("git fetch -q origin")
+            and "a nightly skipped because another run was still in progress after 2 hours" in prompt
+            and "its ACTION line is the only one: `" + NIGHTLY_SKIPPED + "`" in order)
+
+
+def test_wait_for_another_run_is_capped_at_2_hours():
+    assert wait_cap_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_wait_cap_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("for up to 120 minutes", "until it ends", 1), r),                # no cap
+        (m.replace("every 60 s, for", "every 600 s, for", 1), r),
+        (m.replace(NIGHTLY_SKIPPED, "ACTION: nightly skipped", 1), r),               # not the exact ACTION line
+        (m.replace("no pull, no publish, no push; skip steps 1 to 6.", "then go on with step 1.", 1), r),
+        (m.replace("record an incident (see \"Incidents\"), ", "", 1), r),
+        (m, r.replace("a nightly skipped because another run was still in progress after 2 hours, ", "", 1)),
+        (m, r.replace("its ACTION line is the only one: `" + NIGHTLY_SKIPPED + "`", "it adds no ACTION line", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not wait_cap_ok(bm, br)
+
+
+def main_check_ok(master: str, routine: str) -> bool:
+    s4 = master[master.find("\n4. "):master.find(PUBLISH_CMD)]
+    return ("**On main.** Run `git -C /workspace/publicfunds rev-parse --abbrev-ref HEAD`. If it does not print `main`, "
+            "do not publish and do not switch branches; begin the report with `" + NOT_ON_MAIN + "`" in s4
+            and "`" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` "
+            "is the only publish ACTION line" in master
+            and "`" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)`" in routine_prompt(routine))
+
+
+def test_main_check_before_the_publish():
+    assert main_check_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_main_check_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("rev-parse --abbrev-ref HEAD`. If it does not print `main`", "status`. If it is not clean", 1), r),
+        (m.replace("do not publish and do not switch branches", "run `git switch main`", 1), r),
+        (m.replace("`" + NOT_ON_MAIN + "`, `ACTION: account", "`ACTION: account", 1), r),
+        (m, r.replace("`" + NOT_ON_MAIN + "`, ", "", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not main_check_ok(bm, br)
+
+
+def test_publish_script_commits_on_the_current_branch_and_refuses_a_push_off_main():
+    """The reason for the main check: the script commits public-data/ on the current branch, then refuses the push (exit 4)."""
+    script = (D.parents[2] / "scripts" / "publish-public-data.sh").read_text(encoding="utf-8")
+    commit = script.find('git commit -q -m "data: refresh public-data/v1')
+    branch = script.find('BR="$(git rev-parse --abbrev-ref HEAD)"')
+    push = script.find("git push -q origin HEAD:main")
+    assert 0 <= commit < branch < push
+    assert '[[ "$BR" == "main" ]] || { log "refusing to push from branch $BR (main only)"; exit 4; }' in script
+
+
+# A real git check of the incident commands, in a temporary repo with a bare remote. The commands are the master's own
+# (only the two paths are changed), so this checks the text that the nightly runs.
+
+
+def _git_env(tmp: Path) -> dict:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"), GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="t",
+               GIT_AUTHOR_EMAIL="t@localhost", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@localhost", HOME=str(tmp))
+    return env
+
+
+def _sh(cmd: str, cwd: Path, env: dict) -> str:
+    return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _incident_repo(tmp_path):
+    env = _git_env(tmp_path)
+    bare, main = tmp_path / "remote.git", tmp_path / "publicfunds"
+    inc = tmp_path / "publicfunds-incidents"
+    _sh(f"git init -q --bare -b main {bare} && git clone -q {bare} {main}", tmp_path, env)
+    _sh("mkdir -p itil public-data && echo seed > itil/README && echo v0 > public-data/x && git add -A && "
+        "git commit -q -m seed && git branch -M main && git push -q origin HEAD:main", main, env)
+
+    def run(cmd: str) -> str:
+        cmd = cmd.strip("`").replace("/workspace/publicfunds-incidents", str(inc)).replace("/workspace/publicfunds", str(main))
+        return _sh(cmd, tmp_path, env)
+
+    assert run(INCIDENT_WT_CMD) == "0"
+    assert run(INCIDENT_WT_CMD) == "0"                                   # a second incident in the same run: no error
+    (inc / "itil" / "INC-test.md").write_text("incident\n")
+    assert run(INCIDENT_COMMIT_CMD) == "0"
+    incident = _sh("git rev-parse HEAD", inc, env)
+    return env, bare, main, inc, incident
+
+
+def test_incident_commit_never_reaches_the_remote_main(tmp_path):
+    env, bare, main, inc, incident = _incident_repo(tmp_path)
+    assert _sh("git rev-parse --abbrev-ref HEAD", main, env) == "main"   # the main checkout never left main
+    assert _sh("git rev-parse --abbrev-ref HEAD", inc, env) == "incidents/local"
+    _sh("echo v1 > public-data/x && git add -- public-data/ && git commit -q -m data && git push -q origin HEAD:main", main, env)
+    remote_main = _sh("git rev-parse main", bare, env)
+    assert remote_main == _sh("git rev-parse HEAD", main, env)
+    assert incident not in _sh("git rev-list main", bare, env).split()   # the incident commit is not in the remote main
+    assert "incidents/local" not in _sh("git branch -a", bare, env)
+    assert not (main / "itil" / "INC-test.md").exists()
+
+
+def test_pushing_head_main_from_the_incidents_branch_would_publish_the_incident(tmp_path):
+    """Must-fail case: the same push from incidents/local carries the incident into main. This is why the checks matter."""
+    env, bare, main, inc, incident = _incident_repo(tmp_path)
+    _sh("git push -q origin HEAD:main", inc, env)
+    assert incident in _sh("git rev-list main", bare, env).split()
+
+
+# Reviewer fixes after the merge of main 8733c608: the full POPIA diff, the checkout ACTION line, publish-data lines on a failed publish.
+
+def popia_diff_ok(master: str) -> bool:
+    s4 = master[master.find("\n4. "):master.find(PUBLISH_CMD)]
+    return (POPIA_DIFF_CMD in s4 and not re.search(r"--stat\b", master)
+            and "Read every line of `data/popia-candidate.diff`" in s4
+            and s4.find(CANDIDATE_CMD) < s4.find(POPIA_DIFF_CMD) < s4.find("- PASS: go on to the publish command."))
+
+
+def test_popia_check_reads_the_full_diff():
+    assert popia_diff_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_popia_diff_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    bads = (
+        good.replace("git diff --no-index --no-color public-data/v1", "git diff --no-index --stat --no-color public-data/v1", 1),
+        good.replace(POPIA_DIFF_CMD, "`git diff --no-index --stat public-data/v1 data/popia-candidate/v1`.", 1),
+        good.replace("Read every line of `data/popia-candidate.diff`", "Read the summary", 1),
+    )
+    for bad in bads:
+        assert bad != good
+        assert not popia_diff_ok(bad)
+
+
+def checkout_action_ok(master: str, routine: str) -> bool:
+    s0 = master[master.find("\n0. "):master.find("\n1. ")]
+    prompt = routine_prompt(routine)
+    return ("index.lock) means **stop and report**: begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), skip steps 1 to 6" in s0
+            and "or `" + CHECKOUT_FAILED + "` when the checkout update exits non-zero" in prompt
+            and "a step 0 stop (a failed checkout update, a failed account or origin check)" in prompt)
+
+
+def test_checkout_update_failure_has_its_own_action_line():
+    assert checkout_action_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_checkout_action_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), ", "", 1), r),
+        (m.replace(CHECKOUT_FAILED, "ACTION: checkout failed", 1), r),
+        (m, r.replace(", or `" + CHECKOUT_FAILED + "` when the checkout update exits non-zero", "", 1)),
+        (m, r.replace(" (a failed checkout update, a failed account or origin check)", "", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not checkout_action_ok(bm, br)
+
+
+def publish_data_lines_ok(master: str) -> bool:
+    e4 = master[master.find("   - If it exits **4**"):master.find("   - Any other non-zero publish exit")]
+    other = master[master.find("   - Any other non-zero publish exit"):master.find("   The wrapper's exit code:")]
+    return all(PUBLISH_DATA_LINES in part for part in (e4, other))
+
+
+def test_failed_publish_quotes_the_publish_data_lines():
+    assert publish_data_lines_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_publish_data_lines_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    first, second = good.find(PUBLISH_DATA_LINES), good.rfind(PUBLISH_DATA_LINES)
+    assert first != second
+    bads = (
+        good[:first] + good[first + len(PUBLISH_DATA_LINES) + 1:],              # dropped on exit 4
+        good[:second] + good[second + len(PUBLISH_DATA_LINES) + 1:],            # dropped on other non-zero exits
+    )
+    for bad in bads:
+        assert not publish_data_lines_ok(bad)
