@@ -123,6 +123,10 @@ Done by the orchestrator, only after two reviewer PASSes on the exact head, the 
 - After the merge, before the deploy: `git revert -m 1 <merge commit>`.
 - After the deploy: copy `docs/bot/live-skill/publicfunds-refresh.LIVE-2026-11-17.md` byte for byte to the live skill path (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`) and write back the saved routine prompt from the private deploy notes, together, in the same step.
 
+## Merge with PR #14 (CHG-2026-064)
+
+A test merge with `git merge-tree` (17 Nov 2026) of this branch at `8744e39b` and the PR #14 branch at `47c007fb` (PR #14 with `main` `ad850d92` merged in) gave no conflict. The two changes can merge in either order.
+
 ## Seen, not touched
 
 - Incidents committed locally on `main` (a duty of the saved prompt, kept as it was): a later publish pushes `HEAD:main`, so a local incident commit on `main` would go out with the next data push. This is outside "never push anything else". The owner may want incidents committed on a local branch, or left uncommitted. Not changed here.
