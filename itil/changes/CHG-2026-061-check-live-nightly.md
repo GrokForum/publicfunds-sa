@@ -9,7 +9,7 @@
 | CIs affected (this RFC) | `itil/changes/CHG-2026-061-check-live-nightly.md`, `itil/registers/change-log.md` |
 | CIs affected (repo part, this branch) | New `scripts/nightly_check_live.py` and `tests/test_nightly_check_live.py` (CI-116); new `docs/bot/live-skill/` (live skill snapshot of 17 Nov 2026, the proposed step as a marked draft, README) and `tests/test_live_skill_snapshot.py`; this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
 | CIs affected (later step, after the owner GO) | Live refresh skill; repo copy `docs/bot/skills/publicfunds-refresh/SKILL.md`; the nightly routine prompt; `itil/registers/csi-register.md` (CSI-036 status) |
-| Linked records | CHG-2026-032 (script and RB-12), CHG-2026-053 (RFC draft, open PR #2), CSI-036, SLO-PD-1, RB-12, D-08 (still open; out of scope) |
+| Linked records | CHG-2026-032 (script and RB-12), CHG-2026-053 (RFC; PR #2, merged 15 Nov 2026 21:25:51 SAST as `c32c5814`, exact head `5e0bfb7f`), CSI-036, SLO-PD-1, RB-12, D-08 (still open; out of scope) |
 | Rollback | For this docs change: close it unmerged, or `git revert -m 1 <merge commit>` if it is later merged. Git is the rollback; no `.bkp` files. The later implementation rollback and the BREACH kill switch are quoted below, reused from CHG-2026-032, CHG-2026-053, RB-12 and CSI-036. |
 
 ## Problem
@@ -24,7 +24,7 @@ After a successful `scripts/publish-public-data.sh --push`, run the existing aft
 
 ### Exact command the nightly would run
 
-The command is the after-publish line already written in RB-12 (`itil/knowledge/runbooks.md:132`) and in CHG-2026-053 (open PR #2, commit `9ff492e`, lines 21–24):
+The command is the after-publish line already written in RB-12 (`itil/knowledge/runbooks.md:132`) and in CHG-2026-053 (PR #2 at commit `9ff492e`, lines 21–24; PR #2, merged 15 Nov 2026 21:25:51 SAST as `c32c5814`, exact head `5e0bfb7f`):
 
 ```
 python3 scripts/check_live.py \
@@ -52,7 +52,7 @@ Use the codes in `scripts/check_live.py:10` and RB-12 (`itil/knowledge/runbooks.
 - **1** = at least one BREACH.
 - **2** = bad command line; nothing was checked.
 
-The early CHG-2026-053 draft named BREACH as exit 3 and WARN as exit 1. That does not match the script. The current PR #2 head (`9ff492e`, lines 27–28) already corrects this. This RFC follows the script and RB-12.
+The early CHG-2026-053 draft named BREACH as exit 3 and WARN as exit 1. That does not match the script. PR #2 at commit `9ff492e` (lines 27–28) corrected this, and the merged record (`itil/changes/CHG-2026-053-check-live-nightly.md`, lines 27–28) has the correct exit codes. This RFC follows the script and RB-12.
 
 How to act on each code (same rule as CHG-2026-053 at `9ff492e`, lines 27–28, aligned with RB-12):
 
@@ -133,6 +133,8 @@ Only positive evidence gives exit 3. If the publish log format changes, the wrap
 Finding for the reviewers and the owner. The nightly report of 17 Nov 2026 said that the publish script committed but did not push, and that a manual push was needed (as reported to the author; the author did not see that run). The local git reflog shows the 17 Nov data commit `7cb9faf` at 03:20:45 SAST and the `origin/main` tracking ref updated by a push at 03:21:05 SAST. The reflog cannot show if the script or a manual `git push` made that push. If the routine runs the script without `--push` and then pushes by hand, a check on the push line only would skip the live check on a night when new data did go live. The `git ls-remote` fallback covers that case. A better fix is that the routine always uses `--push` and never pushes by hand. That is a routine decision for the owner, not part of this branch.
 
 ### Proposed routine and skill text (draft only; not applied)
+
+The current draft is `docs/bot/live-skill/publicfunds-refresh.PROPOSED-CHG-2026-061.md`. It adds the step-1 condition, moves step 3's publish wording into the new step, and says that the routine prompt does not publish again (see "Follow-up (owner decisions)"). The block below is the earlier version of the step text.
 
 This replaces the block in "Exact text to add after the owner GO" for the later step. It needs two reviewer PASSes and the owner's own GO naming the exact head. Put it in the routine prompt, the live skill and the repo skill copy (`docs/bot/skills/publicfunds-refresh/SKILL.md`), after the publish step and before the review-app health check:
 
@@ -269,8 +271,8 @@ Docs-only RFC wording. No SA ID, passport, phone, email, address, account number
 
 ## Seen, not touched
 
-- The early CHG-2026-053 exit-code slip (BREACH as exit 3, WARN as exit 1). The current PR #2 head already corrects it. This RFC follows the script.
-- CSI-009 / CHG-2026-044 still say "PR open, not merged" even though the backup code is on `main`. Out of scope.
+- The early CHG-2026-053 exit-code slip (BREACH as exit 3, WARN as exit 1). PR #2 corrected it before its merge (`c32c5814`). This RFC follows the script.
+- CSI-009 / CHG-2026-044 said "PR open, not merged" even though the backup code is on `main`. The RFC left this out of scope; the repo part updated both (see "Docs follow-ups in this branch").
 - KE-001 text is behind the current page-5 symptom. Out of scope.
 - D-08 (external uptime check) stays open.
 
@@ -295,7 +297,7 @@ Repo part (17 Nov 2026, branch `chg-2026-061-nightly-check-live`; draft PR #13, 
 A reviewer gave PASS_WITH_CONCERNS on `72d84812` (outside GitHub, as reported to the author (PublicFunds)), with two findings. This commit answers both:
 
 1. **The record, `STATUS.md` and the change-log described the branch as not pushed and with no PR.** They now state that draft PR #13 was opened on 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`. Things still to do are in "Follow-up (owner decisions)" below.
-2. **The live skill was not in the head.** `docs/bot/live-skill/publicfunds-refresh.LIVE-2026-11-17.md` is a byte-for-byte copy of the live `publicfunds-refresh` skill of 17 Nov 2026 (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`). `docs/bot/live-skill/publicfunds-refresh.PROPOSED-CHG-2026-061.md` is the same text with the proposed step added as a marked draft (step 4; later steps renumbered). `tests/test_live_skill_snapshot.py` checks that the draft differs from the snapshot only by that step. The live skill, the template skill copy (`docs/bot/skills/publicfunds-refresh/SKILL.md`) and the nightly routine prompt are not changed. POPIA scan of the copied text: PASS (no names, accounts, contact details or personal paths; only the repo path, the local review-app address and role words).
+2. **The live skill was not in the head.** `docs/bot/live-skill/publicfunds-refresh.LIVE-2026-11-17.md` is a byte-for-byte copy of the live `publicfunds-refresh` skill of 17 Nov 2026 (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`). At `02fa60df`, `docs/bot/live-skill/publicfunds-refresh.PROPOSED-CHG-2026-061.md` was the same text with the proposed step added as a marked draft (step 4; later steps renumbered), and `tests/test_live_skill_snapshot.py` checked it. The next review changed both (see "Review of head `02fa60df`"). The live skill, the template skill copy (`docs/bot/skills/publicfunds-refresh/SKILL.md`) and the nightly routine prompt are not changed. POPIA scan of the copied text: PASS (no names, accounts, contact details or personal paths; only the repo path, the local review-app address and role words).
 
 ## Follow-up (owner decisions)
 
@@ -305,3 +307,23 @@ These items are outside this change. Each one needs the owner's own decision or 
 2. Choose the source of truth for the refresh skill (the live skill or the template copy) and bring the other copy in line.
 3. Decide if the routine always uses `--push` and never pushes by hand ("Push detection").
 4. After item 1: update CSI-036 for the nightly step and refresh the live-skill snapshot in the repo. D-08 stays open.
+
+Notes for the owner GO on item 1:
+
+- (i) The nightly routine prompt already runs the publish. If only the skill step is applied, the night publishes twice. Change the routine prompt and the live skill together, so that the publish runs once (the draft step 4 says this).
+- (ii) Step 4 runs only if step 1 returned 0. Step 3's publish wording (evidence guard line, exit 3, exit 4) moves into step 4, after the publish command. The draft file has both changes.
+
+## Review of head `02fa60df` and this commit
+
+A reviewer gave PASS_WITH_CONCERNS on `02fa60df` (as reported to the author (PublicFunds)). Nothing blocked. This commit answers the points:
+
+1. The links to CHG-2026-053 said "open PR #2". They now give the merge: PR #2, merged 15 Nov 2026 21:25:51 SAST as `c32c5814`, exact head `5e0bfb7f` (from `gh pr view 2`).
+2. `tests/test_live_skill_snapshot.py` removed the whole span from the step-4 marker to "5. Check", so extra unmarked text in that span still passed. The test now builds the expected draft from the live snapshot with the exact step-4 text and the renumbering, and asserts that the draft file is equal to it. A negative test adds extra text in three places, and removes the step-1 condition, and checks that each one fails.
+3. Merge order with PR #14 (CHG-2026-064): see "Merge notes".
+4. "Follow-up (owner decisions)" has notes (i) and (ii) for the owner GO. The draft file now has the step-1 condition, step 3's publish wording moved into step 4, and the one-publish rule. The test checks the new text exactly.
+5. Stale current-state wording found by a search of the changed files: `STATUS.md` (CHG-2026-054 "open PR": now the PR #3 merge), CSI-036 (CHG-2026-053 "open PR": now the PR #2 and PR #10 merges) and the "Seen, not touched" CSI-009 line (now says the repo part updated it).
+
+## Merge notes
+
+- PR #13 (this change) and PR #14 (CHG-2026-064) both change `STATUS.md`, `itil/registers/change-log.md` and the CHG-2026-063 record. A test merge with `git merge-tree` gives conflicts in those three files in either order.
+- Order: PR #13 merges first. Then PR #14 merges `main` into its branch (no rebase) and resolves the conflicts: `STATUS.md` keeps the PR #13 block and adds the CHG-2026-064 line; the CHG-2026-063 record and the change-log take the CHG-2026-064 wording.

@@ -43,7 +43,7 @@
 - 2026-10-23 19:06 SAST: CHG-2026-023 (fuel Inland 95 ULP label) merged as PR #21 (merge 74456bc, owner GO [owner GO; exact words in the private approval record] at 19:03 SAST); the corrected label publishes at the next nightly refresh. Gate locked.
 
 ## Operator notes (2026-11-06)
-- Draft operator release notes (plain sentences: date, what you will notice, what can break the routine, what to do on failure): `docs/operator/release-notes.md` (CHG-2026-054, open PR). GitHub Releases from `snapshot-*` tags are the backup.
+- Draft operator release notes (plain sentences: date, what you will notice, what can break the routine, what to do on failure): `docs/operator/release-notes.md` (CHG-2026-054, PR #3, merged 15 Nov 2026 21:26 SAST as `c3ce8204`). GitHub Releases from `snapshot-*` tags are the backup.
 
 ## Queued (2026-11-06)
 - Offsite MariaDB backup on domains.co.za and a local `/wd` copy remain queued (CSI-055, CI-050). The review database needs a POPIA review and encryption before any offsite copy. **Do not build MariaDB yet.** Local state backup on the box continues under CSI-009 / CHG-2026-044.

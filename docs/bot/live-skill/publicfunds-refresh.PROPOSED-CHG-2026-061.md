@@ -6,7 +6,8 @@ description: >-
   and report what changed.
 ---
 <!-- DRAFT (CHG-2026-061). NOT APPLIED. This is the live skill text of 17 Nov 2026 with the proposed CHG-2026-061 step added.
-     The live skill and the nightly routine prompt change only after the owner's own GO for that step. -->
+     The live skill and the nightly routine prompt change only after the owner's own GO for that step,
+     and they change together, so that the publish runs once per night. -->
 # PublicFunds refresh
 
 0. Update the checkout first (CHG-2026-025). Run exactly: `cd /workspace/publicfunds && [ "$(git branch --show-current)" = main ] && [ -z "$(git status --porcelain --untracked-files=no)" ] && git fetch -q origin && git merge --ff-only origin/main`
@@ -20,13 +21,13 @@ description: >-
    - otherwise draft an incident with **publicfunds-itil**.
    Never bypass a block (403, login, WAF).
 3. Report briefly: the coverage headline, flag counts by detector, and new flags or flags with "evidence changed" (`uv run pf review list --status stale`).
+4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.
+   This step replaces the publish in the nightly routine prompt. The routine prompt must not publish again (one publish per night).
+   `cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`
+   Read data/publish-run.log for the evidence_guard line and the publish result. Do not push by hand.
    - **Publish guard line (CHG-2026-041, applied 26 Oct 2026 with the owner's approval).** When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN), and begin the report with `ACTION: publish needs attention` and quote the line. Never describe an `UNKNOWN` or missing guard line as a pass.
    - If the publish script exits **3**, the export was refused: nothing was published, the files in `public-data/` are left as they are, nothing was committed or pushed. Do not retry and do not edit data. Report to the owner at once: the exit code, the `evidence_guard:` line (`BLOCKED` means the evidence guard refused; `not an evidence-guard refusal` means the cause may be the quality gate, the safety scan, another refusal or a crash, so read `data/publish-data.log` and quote its last lines with `data/publish-data.json`). `scripts/check_live.py` warns at 30 h of data age and breaches at 48 h, so the owner must hear before then.
    - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.
-4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Publish, then check the live site:
-   `cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`
-   Read data/publish-run.log for the evidence_guard line and the publish result, as before.
-   Do not push by hand.
    Then run: `python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`
    - Put its RESULT: line, any [BREACH] / [WARN] lines, and its check_live:, healthz: and NEXT: lines in the nightly report.
    - 0: OK, or WARN only. Report any [WARN] lines. The rest of the routine may finish.
