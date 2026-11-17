@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
-| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then this record update. The branch result is variant A. |
+| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then this record update. The branch result is variant A. Draft PR #14 was opened 17 Nov 2026 11:51 SAST by the orchestrator at head `cecd6503`. |
 | Decision | **Variant A** (keep `Disallow: /`), chosen by the owner on 17 Nov 2026, as reported to the author (PublicFunds). Variant B was made as commit `ea449394` and reverted by commit `b3cb0ea8` (`git revert ea449394`). |
 | Type | **Standard** (records only). The net change from `de37f666` does not change `robots.txt`, the HTML pages, the tests or the CI register. Variant B (Normal-high: hosting / distribution) was reverted on the branch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
@@ -13,7 +13,7 @@
 
 ## Goal
 
-1. Correct the CHG-2026-063 records on `main`. They still describe a DEV branch that is not merged. After this change they state, as past-tense facts, the merge of PR #12 and the live check.
+1. Correct the CHG-2026-063 records on `main`. At `de37f666` they described the DEV branch before its merge. After this change they state, as past-tense facts, the merge of PR #12 and the live check.
 2. Give the owner two robots.txt variants to choose from, after the reviewer concern about how robots.txt and the noindex meta tag work together. The owner chose variant A.
 
 ## Commit A: records (robots.txt unchanged)
@@ -53,10 +53,13 @@
 
 ## Merge notes (PR #13, CHG-2026-061)
 
-The PR #13 branch also updates the same CHG-2026-063 lines (its commit `8385edb`). This change uses the same text where the facts allow:
+The PR #13 branch also changes `STATUS.md`, the change-log and the CHG-2026-063 record. The conflicts cannot be avoided. A test merge with `git merge-tree` (17 Nov 2026, this branch against PR #13 head `7a7cd868`, and the reverse) gives 5 conflict blocks in 3 files in either order: `STATUS.md` (1), the CHG-2026-063 record (3: Status row; Reviewer rows; Outcome and Process note) and `itil/registers/change-log.md` (1).
 
-- the same text: the `STATUS.md` CHG-2026-063 line, the CHG-2026-063 Environment and Change authority rows and Outcome line. The CHG-2026-064 `STATUS.md` line is placed away from the lines that PR #13 changes. Commit A does not change the CI register, so PR #13's CI-116 and CI-117 rows merge without a conflict;
-- different text, because the reviews outside GitHub are now recorded and "Recorded by CHG-2026-061" is only true if PR #13 merges: the CHG-2026-063 Status row, the Reviewer 1 and 2 rows, the Process note and the change-log row. Whichever PR merges second takes the CHG-2026-064 text for these lines.
+- Order: PR #13 merges first.
+- After PR #13 merges, this branch gets a merge of `main` (no rebase) and resolves the conflicts:
+  - `STATUS.md`: keep the PR #13 block as it is on `main`, and add the CHG-2026-064 line;
+  - the CHG-2026-063 record and `itil/registers/change-log.md`: take the CHG-2026-064 wording (it records the reviews outside GitHub and does not depend on PR #13 being merged).
+- Older current-state lines on `main` (for example "Open PRs" in `STATUS.md`, "open PR #2" and "draft PR #10, not merged" in the CHG-2026-061 record, and the change-log rows of CHG-2026-044, CHG-2026-052 to CHG-2026-055 and CHG-2026-061) are corrected by PR #13. This branch does not change them, so that it adds no more conflicts.
 
 ## Stays the same
 
@@ -82,3 +85,7 @@ The PR #13 branch also updates the same CHG-2026-063 lines (its commit `8385edb`
 ## Post-implementation review
 
 - Outcome: see the merge record.
+
+## Review of head `cecd6503` and this commit
+
+A reviewer gave PASS_WITH_CONCERNS on `cecd6503` (as reported to the author (PublicFunds)). Nothing blocked. The merge notes said that the conflicts with PR #13 were avoided. The reviewer's test merge showed 5 conflict blocks in 3 files in either order, and `git merge-tree` against PR #13 head `7a7cd868` gave the same result. "Merge notes" now says that the conflicts cannot be avoided and gives the order and the resolution.
