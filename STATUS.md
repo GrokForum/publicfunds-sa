@@ -2,7 +2,8 @@
 
 ## Current (15 Nov 2026)
 
-- 17 Nov 2026, DEV: CHG-2026-063 (hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag) is built on local branch `chg-2026-063-robots-noindex` from `7cb9faf`. Not pushed. It needs two reviewer PASSes and an owner GO that names the exact head. Rollback: delete the branch, or after a merge `git revert -m 1 <merge commit>`.
+- Merged and live: CHG-2026-063 (PR #12, hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag): merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129` (pre-change tag `snapshot-2026-11-17-pre-chg063`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Live `robots.txt` HTTP 200 with the exact content and `check_live` OK at 11:30 SAST. Rollback: `git revert -m 1 de37f666`.
+- CHG-2026-064 (follow-up to the review of CHG-2026-063): corrects the CHG-2026-063 records and offers robots.txt variant A (`Disallow: /`) or B (empty `Disallow:` plus the noindex meta tag). The owner chooses; the merged `robots.txt` shows the choice. Reviews of PR #12: on GitHub none shown; outside GitHub one reviewer PASS, then a second reviewer PASS_WITH_CONCERNS (as reported to the author (PublicFunds)).
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
 - Live data build: B20261115T011932Z, generated 15 Nov 2026 03:20 SAST, `code_commit` `1c6ecda` (the 15 Nov 2026 nightly). After the PR #9 merge, `scripts/check_live.py` exited 0 at 20:06 SAST; the published data is still that nightly.
 - PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change (see `changes/CAB-DECISION.md`). Owner GO by role and date; exact words are in the private approval record.
