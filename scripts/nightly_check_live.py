@@ -16,9 +16,14 @@ Exit code of this wrapper, and what the routine does next:
     1 = check_live exit 1 (at least one [BREACH]). The wrapper reports it, runs the review-app health check
         (curl -s http://127.0.0.1:8765/healthz) and prints its result. Then stop. Never re-publish. Follow RB-12.
     2 = check failed: check_live exit 2 (bad command line, nothing checked), any other exit code, a crash, or the
-        overall time limit. Report it as a failed check and stop. Never report it as OK.
-    3 = skipped: the publish did not push (it exited non-zero, had nothing to commit, or committed without a push).
-        check_live is not run. The publish rules in the refresh skill still apply.
+        overall time limit. Also exit 2 when the wrapper cannot tell if the publish pushed (no known log line, an
+        unreadable log, an unexpected publish exit code, a git or ls-remote error, or origin/main has moved past
+        the data commit), and for a bad wrapper command line or --help. Report it as a failed check and stop.
+        Never report it as OK.
+    3 = skipped: the log or exit code shows positively that the publish did not push. Only these cases:
+        the publish refused (exit 3 or 4); nothing to commit; only timestamps changed; or it committed with no
+        push line and origin/main is still behind that data commit (run without --push). check_live is not run.
+        The publish rules in the refresh skill still apply.
 
 Read-only. Standard library only. It writes nothing, and it never runs the publish script or git push.
 """
@@ -76,26 +81,59 @@ def local_sha(short: str, run=subprocess.run) -> str | None:
     return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
 
 
-def publish_pushed(exit_code: int, log_text: str | None, run=subprocess.run) -> tuple[bool, str]:
-    """Did the publish push? Returns (pushed, reason). Fails closed: when in doubt, not pushed."""
+def is_ancestor(older: str, newer: str, run=subprocess.run) -> bool | None:
+    """git merge-base --is-ancestor (read-only). True or False, or None if git cannot tell (for example an unknown commit)."""
+    try:
+        p = run(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", older, newer], capture_output=True, text=True,
+                timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {0: True, 1: False}.get(p.returncode)
+
+
+PUSHED, NOT_PUSHED, UNKNOWN = "pushed", "not pushed", "unknown"
+# Publish script exit codes that mean a refusal: 3 = export refused, 4 = commit or push refused. Nothing is pushed.
+REFUSED_EXITS = (3, 4)
+
+
+def publish_pushed(exit_code: int, log_text: str | None, run=subprocess.run) -> tuple[str, str]:
+    """Did the publish push? Returns (PUSHED | NOT_PUSHED | UNKNOWN, reason).
+
+    NOT_PUSHED only when the exit code or the script's own log lines show it positively. Anything else is UNKNOWN,
+    so a change in the log format can never turn the check off without a report.
+    """
+    if exit_code in REFUSED_EXITS:
+        return NOT_PUSHED, f"publish exited {exit_code} (refused); nothing was pushed by the script"
     if exit_code != 0:
-        return False, f"publish exited {exit_code}; nothing was pushed by the script"
+        return UNKNOWN, f"publish exited {exit_code}; cannot tell if it pushed"
     if log_text is None:
-        return False, "publish output not readable; cannot confirm a push"
+        return UNKNOWN, "publish output not readable; cannot tell if it pushed"
     if PUSHED_RE.search(log_text):
-        return True, "publish script pushed to origin/main"
-    if NOTHING_RE.search(log_text):
-        return False, "publish had nothing to commit; nothing was pushed"
+        return PUSHED, "publish script pushed to origin/main"
+    nothing = NOTHING_RE.search(log_text)
+    if nothing:
+        return NOT_PUSHED, f"publish: {nothing.group(1)}; nothing was pushed"
     m = COMMITTED_RE.search(log_text)
     if not m:
-        return False, "no commit or push line in the publish output; cannot confirm a push"
-    # Committed but the script did not push (run without --push). If the data commit is on origin/main anyway
-    # (pushed outside the script), the live site still serves new data, so the check runs.
-    full = local_sha(m.group(1), run)
+        return UNKNOWN, "no known commit, push or no-change line in the publish output; cannot tell if it pushed"
+    short = m.group(1)
+    # Committed with no push line: the script ran without --push. Compare origin/main with the data commit.
+    full = local_sha(short, run)
+    if not full:
+        return UNKNOWN, f"publish committed {short}, but git cannot read that commit; cannot tell if it was pushed"
     remote = remote_main_sha(run)
-    if full and remote and full == remote:
-        return True, f"publish committed {m.group(1)} without a push; origin/main equals that commit (pushed outside the script)"
-    return False, f"publish committed {m.group(1)} but did not push; origin/main does not equal it"
+    if not remote:
+        return UNKNOWN, f"publish committed {short}, but git ls-remote failed; cannot tell if it was pushed"
+    if full == remote:
+        return PUSHED, f"publish committed {short} without a push; origin/main equals that commit (pushed outside the script)"
+    behind = is_ancestor(remote, full, run)
+    if behind is True:
+        return NOT_PUSHED, f"publish committed {short} without --push; origin/main is still behind it, so it was not pushed"
+    if behind is None:
+        return UNKNOWN, f"publish committed {short}; origin/main is a commit git cannot compare; cannot tell if it was pushed"
+    if is_ancestor(full, remote, run) is True:
+        return UNKNOWN, f"publish committed {short}; origin/main has moved past it; cannot tell if it was pushed"
+    return UNKNOWN, f"publish committed {short}; origin/main does not contain it and is not behind it; cannot tell if it was pushed"
 
 
 def _clip(text: str) -> str:
@@ -137,20 +175,25 @@ def main(argv: list[str] | None = None, run=subprocess.run, out=print) -> int:
     try:
         a = ap.parse_args(argv)
     except SystemExit as exc:
-        if exc.code == 0:      # --help
-            return EXIT_OK
-        out("check_live: FAILED CHECK (bad command line for the wrapper; nothing checked)")
+        if exc.code == 0:      # --help: nothing was checked, so it must never read as OK
+            out("check_live: FAILED CHECK (help shown; nothing checked)")
+        else:
+            out("check_live: FAILED CHECK (bad command line for the wrapper; nothing checked)")
         out("NEXT: stop. Report this as a failed check, not as OK.")
         return EXIT_FAILED
     try:
         log_text = a.publish_log.read_text(encoding="utf-8", errors="replace")
     except OSError:
         log_text = None
-    pushed, why = publish_pushed(a.publish_exit, log_text, run)
-    if not pushed:
+    state, why = publish_pushed(a.publish_exit, log_text, run)
+    if state == NOT_PUSHED:
         out(f"check_live: SKIPPED ({why})")
         out("NEXT: check_live not run. Follow the refresh skill for the publish result.")
         return EXIT_SKIPPED
+    if state != PUSHED:
+        out(f"check_live: FAILED CHECK ({why})")
+        out("NEXT: stop. Report this as a failed check, not as OK. Check by hand if new data went live.")
+        return EXIT_FAILED
     out(f"check_live: running ({why})")
     code, output = run_check(run)
     lines = report_lines(output)

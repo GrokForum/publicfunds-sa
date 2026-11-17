@@ -11,7 +11,9 @@ SPEC = importlib.util.spec_from_file_location("nightly_check_live", ROOT / "scri
 ncl = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ncl)
 
-HEAD = "a" * 40
+HEAD = "a" * 40   # the data commit
+OLD = "b" * 40    # origin/main before the data commit
+NEW = "c" * 40    # origin/main after the data commit
 PUSHED = ("[publish-data 03:20:30 SAST] exported: 4384965 bytes, 19 files\nevidence_guard: pass\n"
           "[publish-data 03:20:45 SAST] committed aaaaaaa\n[publish-data 03:20:50 SAST] pushed to origin/main\n")
 COMMITTED_ONLY = ("[publish-data 03:20:30 SAST] exported: 4384965 bytes, 19 files\nevidence_guard: pass\n"
@@ -26,8 +28,11 @@ BREACH_OUT = "[OK] home: 200\n[BREACH] sample municipalities.json: sha256 differ
 class FakeRun:
     """Stands in for subprocess.run. Records every command; never starts a process."""
 
-    def __init__(self, check=(0, OK_OUT), remote=HEAD, local=HEAD, healthz=(0, '{"ok": true}'), raise_on=None):
+    def __init__(self, check=(0, OK_OUT), remote=HEAD, local=HEAD, healthz=(0, '{"ok": true}'), raise_on=None,
+                 ancestors=(), known=None):
         self.check, self.remote, self.local, self.healthz, self.raise_on = check, remote, local, healthz, raise_on
+        self.ancestors = set(ancestors)            # (older, newer) pairs for git merge-base --is-ancestor
+        self.known = set(known) if known is not None else {HEAD, OLD, NEW}
         self.calls = []
 
     def __call__(self, cmd, **kw):
@@ -44,6 +49,11 @@ class FakeRun:
             return subprocess.CompletedProcess(cmd, self.healthz[0], self.healthz[1], "")
         if kind == "ls-remote":
             return subprocess.CompletedProcess(cmd, 0 if self.remote else 2, f"{self.remote}\trefs/heads/main\n" if self.remote else "", "")
+        if kind == "merge-base":
+            older, newer = cmd[-2], cmd[-1]
+            if older not in self.known or newer not in self.known:
+                return subprocess.CompletedProcess(cmd, 128, "", "fatal: Not a valid commit name")
+            return subprocess.CompletedProcess(cmd, 0 if (older, newer) in self.ancestors else 1, "", "")
         if kind == "rev-parse":
             return subprocess.CompletedProcess(cmd, 0 if self.local else 1, (self.local or "") + "\n", "")
         raise AssertionError(f"unexpected command {cmd}")
@@ -53,7 +63,7 @@ class FakeRun:
         if cmd[0] == "curl":
             return "healthz"
         if cmd[0] == "git":
-            return "ls-remote" if "ls-remote" in cmd else "rev-parse"
+            return "ls-remote" if "ls-remote" in cmd else "merge-base" if "merge-base" in cmd else "rev-parse"
         if cmd[1].endswith("check_live.py"):
             return "check"
         return "other"
@@ -130,36 +140,76 @@ def test_time_limit_is_a_failed_check(tmp_path):
     assert code == 2 and any("did not finish within" in l for l in lines)
 
 
-@pytest.mark.parametrize("exit_code", [1, 3, 4, 127])
-def test_publish_failed_skips(tmp_path, exit_code):
+@pytest.mark.parametrize("exit_code", [3, 4])
+def test_publish_refused_skips(tmp_path, exit_code):
     code, lines, run = go(tmp_path, PUSHED, exit_code=exit_code)
     assert code == 3 and run.calls == []
-    assert lines[0] == f"check_live: SKIPPED (publish exited {exit_code}; nothing was pushed by the script)"
+    assert lines[0] == f"check_live: SKIPPED (publish exited {exit_code} (refused); nothing was pushed by the script)"
 
 
-@pytest.mark.parametrize("log", [NOTHING, TIMESTAMPS])
-def test_nothing_committed_skips(tmp_path, log):
+@pytest.mark.parametrize("exit_code", [1, 2, 5, 127, -1])
+def test_unexpected_publish_exit_is_a_failed_check(tmp_path, exit_code):
+    code, lines, run = go(tmp_path, PUSHED, exit_code=exit_code)
+    assert code == 2 and run.calls == []
+    assert lines[0].startswith("check_live: FAILED CHECK (") and "cannot tell" in lines[0]
+    assert lines[-1].startswith("NEXT: stop. Report this as a failed check, not as OK.")
+
+
+@pytest.mark.parametrize("log,word", [(NOTHING, "nothing to commit"), (TIMESTAMPS, "only timestamps changed")])
+def test_nothing_committed_skips(tmp_path, log, word):
     code, lines, run = go(tmp_path, log)
-    assert code == 3 and run.calls == [] and "nothing to commit" in lines[0]
+    assert code == 3 and run.calls == [] and word in lines[0] and lines[0].startswith("check_live: SKIPPED")
 
 
-def test_unreadable_or_empty_log_skips(tmp_path):
+def test_committed_without_push_and_origin_behind_skips(tmp_path):
+    code, lines, run = go(tmp_path, COMMITTED_ONLY, remote=OLD, ancestors={(OLD, HEAD)})
+    assert code == 3 and "check" not in run.kinds()
+    assert lines[0].startswith("check_live: SKIPPED") and "origin/main is still behind it" in lines[0]
+
+
+def test_unreadable_log_is_a_failed_check(tmp_path):
     code, lines, run = go(tmp_path, None)
-    assert code == 3 and run.calls == [] and "not readable" in lines[0]
-    code, lines, run = go(tmp_path, "")
-    assert code == 3 and run.calls == [] and "cannot confirm a push" in lines[0]
+    assert code == 2 and run.calls == [] and "not readable" in lines[0]
 
 
-def test_committed_without_push_skips_when_origin_differs(tmp_path):
-    code, lines, run = go(tmp_path, COMMITTED_ONLY, remote="b" * 40)
-    assert code == 3 and "check" not in run.kinds()
-    assert "committed aaaaaaa but did not push" in lines[0]
+@pytest.mark.parametrize("log", [
+    "",                                                                           # empty
+    "evidence_guard: pass\n",                                                    # no publish line at all
+    "[publish-data 03:20 SAST] pushed to origin/main\n",                         # changed time format
+    "[publish 03:20:50 SAST] pushed to origin/main\n",                           # changed prefix
+    "[publish-data 03:20:50 SAST] pushed to origin main\n",                      # changed wording
+    "evidence_guard:   pushed to origin/main\npushed to origin/main\n",         # forged, not the script's own form
+])
+def test_no_known_log_line_is_a_failed_check(tmp_path, log):
+    code, lines, run = go(tmp_path, log)
+    assert code == 2 and run.calls == []
+    assert lines[0].startswith("check_live: FAILED CHECK (no known commit, push or no-change line")
 
 
-@pytest.mark.parametrize("fake", [{"remote": None}, {"local": None}, {"raise_on": "ls-remote"}])
-def test_committed_without_push_fails_closed(tmp_path, fake):
-    code, _, run = go(tmp_path, COMMITTED_ONLY, **fake)
-    assert code == 3 and "check" not in run.kinds()
+@pytest.mark.parametrize("fake,word", [
+    ({"local": None}, "git cannot read that commit"),
+    ({"remote": None}, "ls-remote failed"),
+    ({"raise_on": "ls-remote"}, "ls-remote failed"),
+    ({"raise_on": "rev-parse"}, "git cannot read that commit"),
+    ({"remote": NEW, "raise_on": "merge-base"}, "git cannot compare"),
+    ({"remote": "d" * 40}, "git cannot compare"),                         # origin/main not known locally
+])
+def test_git_errors_are_failed_checks(tmp_path, fake, word):
+    code, lines, run = go(tmp_path, COMMITTED_ONLY, **fake)
+    assert code == 2 and "check" not in run.kinds()
+    assert lines[0].startswith("check_live: FAILED CHECK") and word in lines[0]
+
+
+def test_origin_moved_past_the_data_commit_is_a_failed_check(tmp_path):
+    code, lines, run = go(tmp_path, COMMITTED_ONLY, remote=NEW, ancestors={(HEAD, NEW)})
+    assert code == 2 and "check" not in run.kinds()
+    assert "origin/main has moved past it" in lines[0]
+
+
+def test_origin_diverged_is_a_failed_check(tmp_path):
+    code, lines, run = go(tmp_path, COMMITTED_ONLY, remote=NEW)
+    assert code == 2 and "check" not in run.kinds()
+    assert "does not contain it and is not behind it" in lines[0]
 
 
 def test_committed_then_pushed_outside_the_script_runs_the_check(tmp_path):
@@ -168,10 +218,17 @@ def test_committed_then_pushed_outside_the_script_runs_the_check(tmp_path):
     assert "pushed outside the script" in lines[0]
 
 
-def test_lines_must_be_the_scripts_own(tmp_path):
-    forged = "evidence_guard:   pushed to origin/main\npushed to origin/main\n"
-    code, _, run = go(tmp_path, forged)
-    assert code == 3 and run.calls == []
+def test_help_is_never_ok(capsys):
+    lines = []
+    assert ncl.main(["--help"], run=FakeRun(), out=lines.append) == 2
+    assert lines == ["check_live: FAILED CHECK (help shown; nothing checked)",
+                     "NEXT: stop. Report this as a failed check, not as OK."]
+
+
+def test_help_from_the_command_line_exits_2():
+    p = subprocess.run([sys.executable, str(ROOT / "scripts" / "nightly_check_live.py"), "--help"],
+                       capture_output=True, text=True, timeout=60)
+    assert p.returncode == 2 and "FAILED CHECK (help shown" in p.stdout
 
 
 def test_bad_wrapper_command_line_is_a_failed_check(capsys):
