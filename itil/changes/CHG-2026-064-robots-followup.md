@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
-| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then the record updates `cecd6503` and `5a4eab3d`. The branch result is variant A. Draft PR #14 was opened 17 Nov 2026 11:51 SAST by the orchestrator at head `cecd6503`. PR #13 (CHG-2026-061) was merged to `main` before this change, as `e5fbfa58` (17 Nov 2026 15:46 SAST, exact head `7a7cd868`, rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`). The branch then merged `main` `e5fbfa58` (no rebase); see "Merge notes". |
+| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then the record updates `cecd6503` and `5a4eab3d`. The branch result is variant A. Draft PR #14 was opened 17 Nov 2026 11:51 SAST by the orchestrator at head `cecd6503`. PR #13 (CHG-2026-061) was merged to `main` before this change, as `e5fbfa58` (17 Nov 2026 15:46 SAST, exact head `7a7cd868`, rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`). The branch then merged `main` `e5fbfa58` (no rebase); see "Merge notes". On 17 Nov 2026 the branch also merged `main` `ad850d92` (PR #15, CHG-2026-065, merged 18:02 SAST, exact head `dd52775a`, tag `snapshot-2026-11-17-1802`); see "Merge of PR #15". |
 | Decision | **Variant A** (keep `Disallow: /`), chosen by the owner on 17 Nov 2026, as reported to the author (PublicFunds). Variant B was made as commit `ea449394` and reverted by commit `b3cb0ea8` (`git revert ea449394`). |
 | Type | **Standard** (records only). The net change from `de37f666` does not change `robots.txt`, the HTML pages, the tests or the CI register. Variant B (Normal-high: hosting / distribution) was reverted on the branch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
@@ -63,6 +63,12 @@ The PR #13 branch also changed `STATUS.md`, the change-log and the CHG-2026-063 
 - After the merge, `robots.txt` (`User-agent: *` / `Disallow: /`, variant A), the tests and `itil/registers/ci-register.md` are identical to `main` `e5fbfa58`.
 - Older current-state lines on `main` were corrected by PR #13. This branch does not change them.
 
+### Merge of PR #15 (CHG-2026-065)
+
+- PR #15 merged to `main` as `ad850d92` (17 Nov 2026 18:02 SAST, exact head `dd52775a`, tag `snapshot-2026-11-17-1802`). It also changed the CHG-2026-061 row and added the CHG-2026-065 row in `itil/registers/change-log.md`.
+- This branch then merged `main` `ad850d92` (`git merge origin/main`, no rebase). The merge had one conflict block, in `itil/registers/change-log.md`, with three rows on each side. The resolution, row by row, as the CHG-2026-065 record planned: the CHG-2026-061 row from `main` (the PR #15 version); the CHG-2026-063 row from this branch; the CHG-2026-064 row; the CHG-2026-065 row from `main`. `STATUS.md` merged without a conflict.
+- After this merge, `robots.txt`, the tests, the CI register and `docs/bot/live-skill/` are identical to `main` `ad850d92`.
+
 ## Stays the same
 
 - The noindex meta tag in `index.html`, `apps/public-dashboard/index.html` and `thusa/review/templates/base.html`.
@@ -76,6 +82,7 @@ The PR #13 branch also changed `STATUS.md`, the change-log and the CHG-2026-063 
 - Commit B (`ea449394`): `uv run pytest -q` 871 passed, 61 skipped; robots and guard tests 12 passed; `dashboard_check` exit 0, 0 problems.
 - After the revert and this record update: same tests as commit A (results in the commit report to the reviewer).
 - After the merge of `main` `e5fbfa58` (17 Nov 2026): `uv run pytest -q` 917 passed, 61 skipped (the PR #13 tests are now included).
+- After the merge of `main` `ad850d92` (17 Nov 2026): `uv run pytest -q` 935 passed, 61 skipped (the PR #15 tests are now included).
 
 ## Approval
 
