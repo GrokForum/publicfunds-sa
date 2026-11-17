@@ -3,11 +3,11 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | The orchestrator held the CHG-2026-065 deploy on 17 Nov 2026 (as reported to the author (PublicFunds)): the proposed pair (master skill and routine prompt) did not have all the duties of the routine prompt that was live then. This record is not a merge GO and not a deploy GO. |
-| Status | Built in DEV on branch `chg-2026-066-nightly-duties` from `main` `ad850d92` (17 Nov 2026; the merge of PR #15, CHG-2026-065, exact head `dd52775a`, 18:02 SAST, tag `snapshot-2026-11-17-1802`). |
+| Status | Built in DEV on branch `chg-2026-066-nightly-duties` from `main` `ad850d92` (17 Nov 2026; the merge of PR #15, CHG-2026-065, exact head `dd52775a`, 18:02 SAST, tag `snapshot-2026-11-17-1802`). Opened as PR #16 at `3341be21`. PR #14 (CHG-2026-064) merged to `main` as `8733c608` (17 Nov 2026 18:25 SAST, post-merge tag `snapshot-2026-11-17-1825`, check_live OK 18:30 SAST, as reported to the author); `main` `8733c608` was then merged into this branch with no conflict. |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline). After the deploy, the nightly routine runs these steps. A merge needs two reviewer PASSes on the exact head and the owner's GO naming that head. The deploy follows the merge. |
 | Environment | DEV (local worktree). Pre-change `main` is `ad850d92dd3ea85bf75486f859219bed3419cbaa`. The merge changes only repo files. The live skill and the routine prompt are outside git and change only at the deploy. |
 | CIs affected | CI-118 (`docs/bot/live-skill/publicfunds-refresh.MASTER.md`, `docs/bot/live-skill/routine-nightly.PROPOSED.md`, `docs/bot/live-skill/README.md`); `tests/test_live_skill_snapshot.py`; `tests/test_popia_candidate_export.py`; this record; the CHG-2026-065 record (merge facts); `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md`. At the deploy: the live refresh skill and the nightly routine prompt (CI-004). |
-| Linked records | CHG-2026-065 (PR #15, merge `ad850d92`), CHG-2026-061, CHG-2026-044 (state backup, appendix A), CHG-2026-041 (publish guard line), CHG-2026-025 (step 0), CI-110, CI-114, CI-116 |
+| Linked records | PR #16; CHG-2026-065 (PR #15, merge `ad850d92`), CHG-2026-064 (PR #14, merge `8733c608`), CHG-2026-061, CHG-2026-044 (state backup, appendix A), CHG-2026-041 (publish guard line), CHG-2026-025 (step 0), CI-110, CI-114, CI-116 |
 | Rollback | See "How to revert". Git is the rollback for the repo; no `.bkp` files. |
 
 ## What and why
@@ -58,7 +58,7 @@ Before the CHG-2026-065 deploy, the orchestrator read the routine prompt that wa
 
 | File | Change |
 |---|---|
-| `docs/bot/live-skill/publicfunds-refresh.MASTER.md` | 10 edits (A to J) on the CHG-2026-065 text: A intro line on the quiet rule, and the "Incidents" block (the exact commands for the local branch `incidents/local` in its own worktree); B step 0 starts with the wait for any other pipeline run (capped at 2 hours) and the account and origin guard, before the pull; C and D incidents on a failed gate and on a new source failure; E in step 4, the standing pre-approval scope, then the main check, the account and origin guard again and the POPIA release check, before the publish command; F and G incidents on a failed push (publish exit 4 and other non-zero exits); H the live check confirms the live manifest shows the new build; I the backup step after the live check; J step 6 scope (never push anything else, never merge PRs). `publish-public-data.sh` is still named once, as the publish command. |
+| `docs/bot/live-skill/publicfunds-refresh.MASTER.md` | 11 edits (A to K) on the CHG-2026-065 text: A intro line on the quiet rule, and the "Incidents" block (the exact commands for the local branch `incidents/local` in its own worktree); B step 0 starts with the wait for any other pipeline run (capped at 2 hours) and the account and origin guard, before the pull; C and D incidents on a failed gate and on a new source failure; E in step 4, the standing pre-approval scope, then the main check, the account and origin guard again and the POPIA release check (the full diff, written to `data/popia-candidate.diff`), before the publish command; F and G on a failed push (publish exit 4 and other non-zero exits): the last lines of `data/publish-data.log` and `data/publish-data.json` in the report, and an incident; H the live check confirms the live manifest shows the new build; I the backup step after the live check; J step 6 scope (never push anything else, never merge PRs); K the step 0 checkout stop begins the report with `ACTION: checkout update failed` (its only ACTION line). `publish-public-data.sh` is still named once, as the publish command. |
 | `docs/bot/live-skill/routine-nightly.PROPOSED.md` | Rewritten: runs the skill's nightly-run path (steps 0 to 6); the account, scope and stop rules; the orchestrator agent message on a backup failure, with a placeholder for the agent id; the incidents branch rule; the quiet rule (with the nightly skipped after 2 hours); the report items with the ACTION lines first (the step 0 ACTION line alone when step 0 stops the run; `ACTION: publish blocked (not on main)` as a blocked publish). `publish-public-data.sh` is named once. The sentence "At the end, send one report" is gone (it contradicted the quiet rule). |
 | `docs/bot/live-skill/README.md` | Deploy steps: save the live prompt privately first, put the agent id into the placeholder, deploy both together; rollback. |
 | `tests/test_live_skill_snapshot.py` | The master is now the CHG-2026-061 draft with the 9 CHG-2026-065 edits and then the 10 CHG-2026-066 edits (`MASTER_EDITS`, `CHG066_EDITS`); a test checks both counts. New tests: duty coverage (`DUTIES`: duty names, the file and a marker string); order (account guard before the first pull; guard again and POPIA check before the publish command; backup after the live check; one publish command); quiet rule; no agent id in the committed files; incidents only on `incidents/local` (text); the 2-hour wait cap and its ACTION line; the main check before the publish; the publish script commits before its branch check and refuses a push off `main` (exit 4); a real git test in a temporary repo with a bare remote that runs the master's own incident commands; each with must-fail cases. |
@@ -70,12 +70,12 @@ Before the CHG-2026-065 deploy, the orchestrator read the routine prompt that wa
 
 ### Why two edit lists
 
-The test compares the master with the CHG-2026-061 draft plus exact edits. The CHG-2026-065 edits (9) are kept as they were merged. The CHG-2026-066 edits (10) are applied after them. A reviewer can see each step separately, and any other change to the master fails the test.
+The test compares the master with the CHG-2026-061 draft plus exact edits. The CHG-2026-065 edits (9) are kept as they were merged. The CHG-2026-066 edits (11) are applied after them. A reviewer can see each step separately, and any other change to the master fails the test.
 
 ### Choices
 
 - **The orchestrator agent id.** The master and the routine prompt are both in git, so neither holds the id. The master says that the routine prompt tells the orchestrator agent. The routine prompt has the placeholder `<orchestrator agent id from the private deploy notes>`. At the deploy, the orchestrator puts in the id from the saved prompt in the private deploy notes. The deployed routine prompt is therefore the committed text with that one placeholder filled; this is the only expected difference.
-- **The POPIA release check.** The publish script exports and pushes in one run, so there is no diff to read before it runs. The check makes a candidate export (`pf publish-data --out data/popia-candidate/v1`, from a copy of `public-data/v1`, so the evidence guard and the changelog compare with the same files) and reads `git diff --no-index` against `public-data/v1`. `data/` is not in git. A candidate exit 3 (export refused) goes on to the publish command, which refuses the same way, so the CHG-2026-041 report lines stay as they are. Any other candidate failure is treated as BLOCK (fail closed).
+- **The POPIA release check.** The publish script exports and pushes in one run, so there is no diff to read before it runs. The check makes a candidate export (`pf publish-data --out data/popia-candidate/v1`, from a copy of `public-data/v1`, so the evidence guard and the changelog compare with the same files) and writes the full `git diff --no-index --no-color public-data/v1 data/popia-candidate/v1` to `data/popia-candidate.diff`, which is read line by line (no `--stat`: a summary of file names and line counts shows no personal data). The diff goes to a file because it can be large: each JSON file is one long line, so a changed file shows in full, and a shell output limit could cut it; the file can be read in parts and nothing is lost. `git diff --no-index` exits 1 when there are changes; any exit other than 0 or 1 is treated as BLOCK. `data/` is not in git. A candidate exit 3 (export refused) goes on to the publish command, which refuses the same way, so the CHG-2026-041 report lines stay as they are. Any other candidate failure is treated as BLOCK (fail closed).
 - **Account and origin guard.** It runs before the step 0 pull and again right before the publish, because the publish script does the push. `GH_TOKEN` stays exported for the run.
 - **Incidents in their own worktree.** The requested design was `git switch` to `incidents/local` and back to `main`. A worktree (`/workspace/publicfunds-incidents`) does the same with less risk: the main checkout never switches branches, so a stale `incidents/local` never puts old code under a running pipeline (for example in the 2-hour wait case, when another run uses the checkout), and a modified file in the main checkout cannot block the switch back. `incidents/local` is made from `main` on first use and so shares its history; that is acceptable because it is never pushed. It is not kept up to date with `main`; the author moves its records to `main` with a normal change.
 - **Backup after a BREACH.** The backup runs after the live check when step 1 and the publish returned 0, also when the wrapper said stop, because the backup does not publish.
@@ -87,6 +87,8 @@ The CHG-2026-065 matrix still applies for a publish that ran. The new cases:
 | Case | Report begins with |
 |---|---|
 | another run still in progress after 120 minutes (step 0) | `ACTION: nightly skipped (another run still in progress after 2h)` only (incident on `incidents/local`; no pull, no publish, no push; the run stops) |
+| step 0 checkout update exits non-zero (not on `main`, dirty tree, diverged, offline fetch, index.lock) | `ACTION: checkout update failed` only (the run stops) |
+| POPIA diff command exits other than 0 or 1 | `ACTION: publish blocked (POPIA)` only (no publish; reason: release check could not run) |
 | step 0 account or origin guard fails | `ACTION: account or origin check failed` only (the run stops) |
 | step 4: the checkout is not on `main` | `ACTION: publish blocked (not on main)` only (no publish, no branch switch) |
 | step 4 account or origin guard fails | `ACTION: account or origin check failed` only (no publish) |
@@ -113,6 +115,12 @@ Decided 17 Nov 2026 by the orchestrator under authority delegated by the owner (
 
 `pf publish-data` (the publish script, line 68, default output `public-data/v1`) and `pf publish-data --out data/popia-candidate/v1` (the POPIA check) both call `thusa.publish_data.export`; only the output directory differs. The output directory is read for the evidence guard (`coverage.json`) and the changelog (`changes.json`, `manifest.json`), which is why the skill copies `public-data/v1` first. The test runs the real `pf` entry point three times on the synthetic fixture warehouse (`tests/conftest.py`), with the repo root moved to a temporary directory so that the default output is a temporary `public-data/v1`: a first export (the files that are live), then the candidate on a copy, then the real export. All files are compared byte for byte; nothing is excluded. The one clock field (`manifest.json` `generated_at_sast`, also used in `changes.json` and `feed.json`) is fixed to one value for both runs. Must-fail cases: without the copy, `changes.json` differs; with a different clock, only `manifest.json`, `changes.json` and `feed.json` differ. Limits: in a real night the two exports run some seconds apart, so those three files differ by that time only; the test uses the fixture warehouse, not the real one; it does not run `scripts/publish-public-data.sh` (never run by the author).
 
+### Reviewer fixes after the merge of `main` `8733c608` (PR #16)
+
+1. POPIA release check: the full diff of `public-data/v1` against `data/popia-candidate/v1`, written to `data/popia-candidate.diff` and read line by line; `--stat` is gone (see "Choices"). Test: the command has no `--stat`; must-fail cases with `--stat` and without the read of the file.
+2. Step 0: a non-zero exit of the checkout update begins the report with `ACTION: checkout update failed`, its only ACTION line. The routine prompt lists it with the other step 0 ACTION lines and in the quiet-rule failure list. Test with must-fail cases.
+3. Publish exit 4 and any other non-zero exit: the report quotes the last 5 lines of `data/publish-data.log` and of `data/publish-data.json`, as on exit 3. Test with must-fail cases.
+
 ## Deploy (after the merge)
 
 Done by the orchestrator, only after two reviewer PASSes on the exact head, the owner's GO naming that head, and the merge to `main`:
@@ -125,7 +133,7 @@ Done by the orchestrator, only after two reviewer PASSes on the exact head, the 
 ## Testing
 
 - `tests/test_live_skill_snapshot.py`: see "Changes". The drift check still accepts the master or the 17 Nov 2026 snapshot.
-- `uv run pytest -q` on this branch, 17 Nov 2026 (no warehouse in the worktree): 955 passed, 61 skipped (`main` `ad850d92`: 935 passed, 61 skipped; 20 new tests: 7 at `8744e39b`, 13 in the follow-up).
+- `uv run pytest -q` on this branch, 17 Nov 2026 (no warehouse in the worktree): 955 passed, 61 skipped (`main` `ad850d92`: 935 passed, 61 skipped; 26 new tests: 7 at `8744e39b`, 13 at `3341be21`, 6 after the merge of `main` `8733c608`).
 
 ## Risk assessment
 
@@ -145,7 +153,9 @@ Done by the orchestrator, only after two reviewer PASSes on the exact head, the 
 
 ## Merge with PR #14 (CHG-2026-064)
 
-A test merge with `git merge-tree` (17 Nov 2026) of this branch at `8744e39b` and the PR #14 branch at `47c007fb` (PR #14 with `main` `ad850d92` merged in) gave no conflict. The two changes can merge in either order.
+PR #14 merged to `main` first, as `8733c608`. `git merge origin/main` into this branch at `3341be21` gave no conflict (merge commit on this branch, 17 Nov 2026).
+
+Before that, a test merge with `git merge-tree` (17 Nov 2026) of this branch at `8744e39b` and the PR #14 branch at `47c007fb` (PR #14 with `main` `ad850d92` merged in) gave no conflict. The two changes can merge in either order.
 
 ## Seen, not touched
 

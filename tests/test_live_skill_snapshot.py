@@ -14,6 +14,7 @@ routine prompt (routine-nightly.PROPOSED.md) goes with it. The dated snapshot st
 """
 import hashlib
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -149,6 +150,9 @@ CANDIDATE_CMD = ("`cd /workspace/publicfunds && rm -rf data/popia-candidate && m
 INCIDENT = "Record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local` (never pushed; see \"Incidents\")."
 NIGHTLY_SKIPPED = "ACTION: nightly skipped (another run still in progress after 2h)"
 NOT_ON_MAIN = "ACTION: publish blocked (not on main)"
+CHECKOUT_FAILED = "ACTION: checkout update failed"
+POPIA_DIFF_CMD = "`cd /workspace/publicfunds && git diff --no-index --no-color public-data/v1 data/popia-candidate/v1 > data/popia-candidate.diff; echo $?`."
+PUBLISH_DATA_LINES = "Quote the last 5 lines of `data/publish-data.log` and of `data/publish-data.json` in the report (as on exit 3)."
 INCIDENT_WT_CMD = ("`cd /workspace/publicfunds && git worktree prune && { [ -d /workspace/publicfunds-incidents ] "
                    "|| git worktree add -q /workspace/publicfunds-incidents incidents/local 2>/dev/null "
                    "|| git worktree add -q -b incidents/local /workspace/publicfunds-incidents main; }; echo $?`")
@@ -172,7 +176,7 @@ STEP4_SCOPE_AND_CHECKS = (
     "   - **On main.** Run `git -C /workspace/publicfunds rev-parse --abbrev-ref HEAD`. If it does not print `main`, do not publish and do not switch branches; begin the report with `" + NOT_ON_MAIN + "`; skip the rest of this step. The publish script commits on the current branch before it checks the branch, so a publish off `main` would leave a data commit on the wrong branch.\n"
     "   - **Account and origin guard again.** Run the step 0 guard command. A non-zero exit: do not publish; begin the report with `ACTION: account or origin check failed`; skip the rest of this step.\n"
     "   - **POPIA release check.** Make the candidate public data without touching `public-data/`: " + CANDIDATE_CMD + "\n"
-    "     If that exits 0, run `git diff --no-index --stat public-data/v1 data/popia-candidate/v1` and read every changed line. Use the **popia-review** skill's release check (copy at `/home/box/shared-laws/popia-review-SKILL.md` if the skill cannot be loaded): no ID, phone or account numbers, no emails, no addresses and no names of private persons.\n"
+    "     If that exits 0, write the full diff to a file: " + POPIA_DIFF_CMD + " Exit 0 (no change) or 1 (changes) is normal; any other exit means the check cannot run, so treat it as BLOCK (`ACTION: publish blocked (POPIA)`, reason: release check could not run). Read every line of `data/popia-candidate.diff`, in parts if it is large (each JSON file is one long line, so a changed file shows in full). Use the **popia-review** skill's release check (copy at `/home/box/shared-laws/popia-review-SKILL.md` if the skill cannot be loaded): no ID, phone or account numbers, no emails, no addresses and no names of private persons.\n"
     "     - PASS: go on to the publish command.\n"
     "     - BLOCK: do not publish. Begin the report with `ACTION: publish blocked (POPIA)`. Say what kind of item was found and in which file, never the personal data itself. Skip the rest of this step.\n"
     "     - The candidate export exits 3 (export refused, nothing written): skip the release check and go on to the publish command. It refuses in the same way, and the publish rules below report it.\n"
@@ -195,15 +199,17 @@ CHG066_EDITS = (
     ("   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n",
      "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n" + STEP4_SCOPE_AND_CHECKS),  # E
     ("(failed first, then needs attention). Stop after the wrapper and report. Do not retry.\n",
-     "(failed first, then needs attention). " + INCIDENT + " Stop after the wrapper and report. Do not retry.\n"),  # F
+     "(failed first, then needs attention). " + PUBLISH_DATA_LINES + " " + INCIDENT + " Stop after the wrapper and report. Do not retry.\n"),  # F
     ("(failed first, then needs attention). Stop and report, and check by hand if new data went live. Do not retry.\n",
-     "(failed first, then needs attention). " + INCIDENT + " Stop and report, and check by hand if new data went live. Do not retry.\n"),  # G
+     "(failed first, then needs attention). " + PUBLISH_DATA_LINES + " " + INCIDENT + " Stop and report, and check by hand if new data went live. Do not retry.\n"),  # G
     ("   - 0: OK, or WARN only. Report any [WARN] lines. The rest of the routine may finish.\n",
      "   - 0: OK, or WARN only. The live manifest shows the new build (the check_live `local.build` line). Report any [WARN] lines. The rest of the routine may finish.\n"),  # H
     ("     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n",
      "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n" + BACKUP_BLOCK),  # I
     ("6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction.",
      "6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction. Never push anything except the step 4 publish of `public-data/`, and never merge PRs."),  # J
+    ("index.lock) means **stop and report**: skip steps 1 to 6",
+     "index.lock) means **stop and report**: begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), skip steps 1 to 6"),  # K
 )
 
 
@@ -251,7 +257,7 @@ def test_live_snapshot_is_byte_exact_to_its_sha256():
 
 
 def test_master_is_the_draft_made_final():
-    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 10
+    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 11
     assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
 
 
@@ -454,9 +460,9 @@ def test_wording_without_publish_failed_fails():
     good = MASTER.read_text(encoding="utf-8")
     bads = (
         # the old exit 4 wording: no ACTION line on exit 4 with a bare pass
-        good.replace("exits 3. " + FAILED_BULLET + " " + INCIDENT, "exits 3. " + INCIDENT, 1),
+        good.replace("exits 3. " + FAILED_BULLET + " " + PUBLISH_DATA_LINES, "exits 3. " + PUBLISH_DATA_LINES, 1),
         # the old other-exit wording
-        good.replace("exits 2. " + FAILED_BULLET + " " + INCIDENT, "exits 2. " + INCIDENT, 1),
+        good.replace("exits 2. " + FAILED_BULLET + " " + PUBLISH_DATA_LINES, "exits 2. " + PUBLISH_DATA_LINES, 1),
         # order swapped on exit 4: needs attention before failed
         good.replace("exits 3. " + FAILED_BULLET,
                      "exits 3. Begin the report with `ACTION: publish needs attention`. If the guard line is not a bare pass, put "
@@ -525,7 +531,7 @@ DUTIES = (
     ("nightly skipped: no pull, no publish, no push", "M", "do nothing else: no pull, no publish, no push"),
     ("nightly skipped in the quiet rule", "R", "a nightly skipped because another run was still in progress after 2 hours"),
     ("incident on a new source failure", "M", "(a source fails in a new way) record an incident"),
-    ("incident on a failed push", "M", "(failed first, then needs attention). Record an incident"),
+    ("incident on a failed push", "M", "(as on exit 3). Record an incident"),
     ("review-app health check and restart", "M", "scripts/review-app.sh restart"),
     ("live manifest shows the new build", "M", "The live manifest shows the new build"),
     ("evidence guard line", "M", "**Publish guard line"),
@@ -777,3 +783,75 @@ def test_pushing_head_main_from_the_incidents_branch_would_publish_the_incident(
     env, bare, main, inc, incident = _incident_repo(tmp_path)
     _sh("git push -q origin HEAD:main", inc, env)
     assert incident in _sh("git rev-list main", bare, env).split()
+
+
+# Reviewer fixes after the merge of main 8733c608: the full POPIA diff, the checkout ACTION line, publish-data lines on a failed publish.
+
+def popia_diff_ok(master: str) -> bool:
+    s4 = master[master.find("\n4. "):master.find(PUBLISH_CMD)]
+    return (POPIA_DIFF_CMD in s4 and not re.search(r"--stat\b", master)
+            and "Read every line of `data/popia-candidate.diff`" in s4
+            and s4.find(CANDIDATE_CMD) < s4.find(POPIA_DIFF_CMD) < s4.find("- PASS: go on to the publish command."))
+
+
+def test_popia_check_reads_the_full_diff():
+    assert popia_diff_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_popia_diff_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    bads = (
+        good.replace("git diff --no-index --no-color public-data/v1", "git diff --no-index --stat --no-color public-data/v1", 1),
+        good.replace(POPIA_DIFF_CMD, "`git diff --no-index --stat public-data/v1 data/popia-candidate/v1`.", 1),
+        good.replace("Read every line of `data/popia-candidate.diff`", "Read the summary", 1),
+    )
+    for bad in bads:
+        assert bad != good
+        assert not popia_diff_ok(bad)
+
+
+def checkout_action_ok(master: str, routine: str) -> bool:
+    s0 = master[master.find("\n0. "):master.find("\n1. ")]
+    prompt = routine_prompt(routine)
+    return ("index.lock) means **stop and report**: begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), skip steps 1 to 6" in s0
+            and "or `" + CHECKOUT_FAILED + "` when the checkout update exits non-zero" in prompt
+            and "a step 0 stop (a failed checkout update, a failed account or origin check)" in prompt)
+
+
+def test_checkout_update_failure_has_its_own_action_line():
+    assert checkout_action_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_checkout_action_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("begin the report with `" + CHECKOUT_FAILED + "` (its only ACTION line), ", "", 1), r),
+        (m.replace(CHECKOUT_FAILED, "ACTION: checkout failed", 1), r),
+        (m, r.replace(", or `" + CHECKOUT_FAILED + "` when the checkout update exits non-zero", "", 1)),
+        (m, r.replace(" (a failed checkout update, a failed account or origin check)", "", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not checkout_action_ok(bm, br)
+
+
+def publish_data_lines_ok(master: str) -> bool:
+    e4 = master[master.find("   - If it exits **4**"):master.find("   - Any other non-zero publish exit")]
+    other = master[master.find("   - Any other non-zero publish exit"):master.find("   The wrapper's exit code:")]
+    return all(PUBLISH_DATA_LINES in part for part in (e4, other))
+
+
+def test_failed_publish_quotes_the_publish_data_lines():
+    assert publish_data_lines_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_publish_data_lines_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    first, second = good.find(PUBLISH_DATA_LINES), good.rfind(PUBLISH_DATA_LINES)
+    assert first != second
+    bads = (
+        good[:first] + good[first + len(PUBLISH_DATA_LINES) + 1:],              # dropped on exit 4
+        good[:second] + good[second + len(PUBLISH_DATA_LINES) + 1:],            # dropped on other non-zero exits
+    )
+    for bad in bads:
+        assert not publish_data_lines_ok(bad)
