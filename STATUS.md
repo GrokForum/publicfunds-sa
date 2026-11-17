@@ -20,6 +20,7 @@
 - Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate (17 Nov 2026 nightly): 58 pass, 1 warn, 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
 - Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
 - CHG-2026-065 (owner decisions of 17 Nov 2026, as reported to the author (PublicFunds)): the repo copy `docs/bot/live-skill/publicfunds-refresh.MASTER.md` is the master of the live refresh skill; step 4 runs on the nightly run only, publishes with `--push` only if step 1 returned 0, then runs the live check. A run on request does not publish unless the owner asks for a publish. The routine prompt text that goes with it is `docs/bot/live-skill/routine-nightly.PROPOSED.md`. The orchestrator deploys both together after the merge.
+- CHG-2026-066: PR #15 (CHG-2026-065) merged as `ad850d92` (17 Nov 2026 18:02 SAST, tag `snapshot-2026-11-17-1802`); its deploy was held because the proposed pair did not have all the duties of the routine prompt that was live then. CHG-2026-066 adds them to the master skill and the proposed routine prompt. The live skill and the routine prompt stay as they were until the CHG-2026-066 deploy.
 
 ## History (as of 2026-10-23)
 

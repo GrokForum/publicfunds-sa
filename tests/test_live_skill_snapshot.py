@@ -135,14 +135,75 @@ MASTER_EDITS = (
      "   - 3: skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push).\n"
      "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n"),  # 9
 )
+# CHG-2026-066: duties of the nightly routine prompt of 17 Nov 2026 moved into the master. The master is now the
+# CHG-2026-061 draft with the 9 CHG-2026-065 edits (MASTER_EDITS) and then these CHG-2026-066 edits (CHG066_EDITS),
+# applied in that order to the text that the CHG-2026-065 edits give. No other change is allowed.
+GUARD_CMD = ("`cd /workspace/publicfunds && export GH_TOKEN=\"$(gh auth token --user GrokForum)\" && [ -n \"$GH_TOKEN\" ] "
+             "&& gh auth setup-git && git remote get-url origin | grep -Eq 'github\\.com[:/]GrokForum/publicfunds-sa(\\.git)?$'; echo $?`")
+WAIT_CMD = "`pgrep -f '[t]husa run' > /dev/null && echo running || echo none`"
+CANDIDATE_CMD = ("`cd /workspace/publicfunds && rm -rf data/popia-candidate && mkdir -p data/popia-candidate "
+                 "&& cp -a public-data/v1 data/popia-candidate/v1 && uv run pf publish-data --out data/popia-candidate/v1 "
+                 "> data/popia-candidate.json 2> data/popia-candidate.log; echo $?`")
+INCIDENT = "Record an incident with **publicfunds-itil** and commit it locally (no push)."
+STEP0_NEW = (
+    "0. Before any git pull or push (CHG-2026-066), in this order:\n"
+    "   - **Wait for any other pipeline run.** Run " + WAIT_CMD + ". If it prints `running`, another `thusa run` is in progress on this computer: wait for it to end (check again every 60 s) and do not start a second run.\n"
+    "   - **Account and origin guard.** Run exactly: " + GUARD_CMD + "\n"
+    "     Every git pull and push in this run goes out as the GrokForum GitHub account, never as any other GitHub account (the computer's active `gh` account can change). Keep `GH_TOKEN` exported for the whole run. If a later command runs in a new shell, run this guard again before any git pull or push. A non-zero exit means **stop and report**: begin the report with `ACTION: account or origin check failed`, skip steps 1 to 6, and do not pull, publish or push.\n"
+    "   Then update the checkout (CHG-2026-025). Run exactly: ")
+STEP4_SCOPE_AND_CHECKS = (
+    "   The push of `public-data/` to `main` of GrokForum/publicfunds-sa by this step is the standing pre-approved change (owner approval of 23 Oct 2026, recorded in `changes/CAB-DECISION.md`; the repo moved to GrokForum on 1 Nov 2026). It covers this data refresh only and updates the live dashboard. Never push anything else and never merge PRs.\n"
+    "   Before the publish command, in this order (CHG-2026-066):\n"
+    "   - **Account and origin guard again.** Run the step 0 guard command. A non-zero exit: do not publish; begin the report with `ACTION: account or origin check failed`; skip the rest of this step.\n"
+    "   - **POPIA release check.** Make the candidate public data without touching `public-data/`: " + CANDIDATE_CMD + "\n"
+    "     If that exits 0, run `git diff --no-index --stat public-data/v1 data/popia-candidate/v1` and read every changed line. Use the **popia-review** skill's release check (copy at `/home/box/shared-laws/popia-review-SKILL.md` if the skill cannot be loaded): no ID, phone or account numbers, no emails, no addresses and no names of private persons.\n"
+    "     - PASS: go on to the publish command.\n"
+    "     - BLOCK: do not publish. Begin the report with `ACTION: publish blocked (POPIA)`. Say what kind of item was found and in which file, never the personal data itself. Skip the rest of this step.\n"
+    "     - The candidate export exits 3 (export refused, nothing written): skip the release check and go on to the publish command. It refuses in the same way, and the publish rules below report it.\n"
+    "     - The candidate export exits with any other non-zero code: the check cannot run, so treat it as BLOCK (`ACTION: publish blocked (POPIA)`, reason: release check could not run; quote the last 5 lines of `data/popia-candidate.log`).\n"
+    "     For a blocked publish, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` is the only publish ACTION line; the publish exit code rules below do not apply, because the publish did not run.\n")
+BACKUP_BLOCK = (
+    "   **Back up state** (CHG-2026-044 appendix A, CHG-2026-066). Do this only if step 1 returned 0 and the publish exited 0. Do it after the live check, also when the wrapper said stop (the backup does not publish).\n"
+    "   `cd /workspace/publicfunds && scripts/backup-state.sh > data/backup-run.log 2>&1; echo $?`\n"
+    "   - 0: put the `backup: ok` line in the report. It adds no ACTION line.\n"
+    "   - Any other exit code: add `ACTION: backup failed` to the report, after any publish ACTION line, and quote the `backup: FAILED` line. Do not retry. Do not delete any backup. The routine prompt also tells the orchestrator agent (the failed line only, no data).\n"
+    "   - Backups stay on this computer only. Never commit, push or publish them.\n")
+CHG066_EDITS = (
+    ("(see step 4).\n\n",
+     "(see step 4). On the nightly run, the routine prompt decides whether the report is sent (it sends nothing when all is well).\n\n"),  # A
+    ("0. Update the checkout first (CHG-2026-025). Run exactly: ", STEP0_NEW),                                          # B
+    ("   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01.\n",
+     "   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01. " + INCIDENT + "\n"),  # C
+    ("   - otherwise draft an incident with **publicfunds-itil**.\n",
+     "   - otherwise (a source fails in a new way) record an incident with **publicfunds-itil** and commit it locally (no push).\n"),  # D
+    ("   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n",
+     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n" + STEP4_SCOPE_AND_CHECKS),  # E
+    ("(failed first, then needs attention). Stop after the wrapper and report. Do not retry.\n",
+     "(failed first, then needs attention). " + INCIDENT + " Stop after the wrapper and report. Do not retry.\n"),  # F
+    ("(failed first, then needs attention). Stop and report, and check by hand if new data went live. Do not retry.\n",
+     "(failed first, then needs attention). " + INCIDENT + " Stop and report, and check by hand if new data went live. Do not retry.\n"),  # G
+    ("   - 0: OK, or WARN only. Report any [WARN] lines. The rest of the routine may finish.\n",
+     "   - 0: OK, or WARN only. The live manifest shows the new build (the check_live `local.build` line). Report any [WARN] lines. The rest of the routine may finish.\n"),  # H
+    ("     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n",
+     "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n" + BACKUP_BLOCK),  # I
+    ("6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction.",
+     "6. Never confirm or reject flags here. Reviews happen only in **publicfunds-review**, on the user's instruction. Never push anything except the step 4 publish of `public-data/`, and never merge PRs."),  # J
+)
+
+
+def apply_edits(text: str, edits) -> str:
+    for old, new in edits:
+        assert text.count(old) == 1, old
+        text = text.replace(old, new)
+    return text
+
+
 ON_REQUEST = "On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**."
 
 
 def expected_master(draft: str) -> str:
-    for old, new in MASTER_EDITS:
-        assert draft.count(old) == 1, old
-        draft = draft.replace(old, new)
-    return draft
+    """The CHG-2026-065 edits, then the CHG-2026-066 edits."""
+    return apply_edits(apply_edits(draft, MASTER_EDITS), CHG066_EDITS)
 
 
 def master_structure_ok(text: str) -> bool:
@@ -174,7 +235,7 @@ def test_live_snapshot_is_byte_exact_to_its_sha256():
 
 
 def test_master_is_the_draft_made_final():
-    assert len(MASTER_EDITS) == 9
+    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 10
     assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
 
 
@@ -211,8 +272,8 @@ def routine_file_ok(text: str) -> bool:
 def test_routine_file_names_the_publish_script_once():
     good = ROUTINE.read_text(encoding="utf-8")
     assert routine_file_ok(good)
-    bad = good.replace("- Never confirm or reject flags.\n",
-                       "- Never confirm or reject flags.\n- Then run `scripts/publish-public-data.sh --push`.\n", 1)
+    bad = good.replace("- If step 0 or step 1 says stop,",
+                       "- Then run `scripts/publish-public-data.sh --push`.\n- If step 0 or step 1 says stop,", 1)
     assert bad != good and not routine_file_ok(bad)                      # a second publish line fails
 
 
@@ -377,9 +438,9 @@ def test_wording_without_publish_failed_fails():
     good = MASTER.read_text(encoding="utf-8")
     bads = (
         # the old exit 4 wording: no ACTION line on exit 4 with a bare pass
-        good.replace("exits 3. " + FAILED_BULLET + " Stop after the wrapper", "exits 3. Stop after the wrapper", 1),
+        good.replace("exits 3. " + FAILED_BULLET + " " + INCIDENT, "exits 3. " + INCIDENT, 1),
         # the old other-exit wording
-        good.replace("exits 2. " + FAILED_BULLET + " Stop and report", "exits 2. Stop and report", 1),
+        good.replace("exits 2. " + FAILED_BULLET + " " + INCIDENT, "exits 2. " + INCIDENT, 1),
         # order swapped on exit 4: needs attention before failed
         good.replace("exits 3. " + FAILED_BULLET,
                      "exits 3. Begin the report with `ACTION: publish needs attention`. If the guard line is not a bare pass, put "
@@ -417,3 +478,119 @@ def test_skip_rule_removed_fails():
     master, routine = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
     assert not skip_rule_ok(master.replace("   " + SKIP_RULE + "\n", "", 1), routine)      # removed from the master
     assert not skip_rule_ok(master, routine.replace(" " + SKIP_RULE, "", 1))               # removed from the routine prompt
+
+
+# CHG-2026-066: duty coverage. Duty names and a marker string only; the prompt that was live on 17 Nov 2026 is kept
+# outside git and is never copied here. Each marker must be in the file named (M = master skill, R = routine prompt).
+DUTIES = (
+    ("wait for any other pipeline run", "M", "pgrep -f '[t]husa run'"),
+    ("pull the latest main", "M", "git merge --ff-only origin/main"),
+    ("run the pipeline", "M", "uv run thusa run"),
+    ("publish only if the data-quality gate passed", "M", "Only if step 1 returned **0**: publish"),
+    ("POPIA release check before the publish", "M", "**POPIA release check.**"),
+    ("POPIA skill fallback copy", "M", "/home/box/shared-laws/popia-review-SKILL.md"),
+    ("POPIA BLOCK: no publish, no personal data in the report", "M", "never the personal data itself"),
+    ("publish with --push", "M", "scripts/publish-public-data.sh --push >"),
+    ("GrokForum token for every pull and push", "M", "gh auth token --user GrokForum"),
+    ("gh auth setup-git", "M", "gh auth setup-git"),
+    ("never another GitHub account", "R", "never as any other GitHub account"),
+    ("origin check before the push", "M", "**Account and origin guard again.**"),
+    ("standing pre-approved change, public-data only", "M", "is the standing pre-approved change"),
+    ("standing pre-approved change, in the routine", "R", "is the standing pre-approved change"),
+    ("never push anything else, never merge PRs", "M", "Never push anything else and never merge PRs."),
+    ("never merge PRs, in the routine", "R", "never merge PRs"),
+    ("never confirm or reject flags", "M", "Never confirm or reject flags"),
+    ("incident on a failed gate, committed locally", "M", "follow runbook RB-01. Record an incident with **publicfunds-itil** and commit it locally (no push)."),
+    ("incident on a new source failure", "M", "(a source fails in a new way) record an incident"),
+    ("incident on a failed push", "M", "(failed first, then needs attention). Record an incident"),
+    ("review-app health check and restart", "M", "scripts/review-app.sh restart"),
+    ("live manifest shows the new build", "M", "The live manifest shows the new build"),
+    ("evidence guard line", "M", "**Publish guard line"),
+    ("refused export: no retry, no data edit", "M", "Do not retry and do not edit data."),
+    ("missing or UNKNOWN guard line is never a pass", "M", "Never describe an `UNKNOWN` or missing guard line as a pass."),
+    ("backup only if build and publish returned 0", "M", "Do this only if step 1 returned 0 and the publish exited 0."),
+    ("backup ok line", "M", "put the `backup: ok` line in the report"),
+    ("ACTION: backup failed", "M", "add `ACTION: backup failed` to the report"),
+    ("backup: no retry, no delete", "M", "Do not delete any backup."),
+    ("backups never committed or pushed", "M", "Never commit, push or publish them."),
+    ("tell the orchestrator agent on a backup failure", "R", "to the orchestrator agent with SendToAgent, priority true"),
+    ("quiet rule: send nothing when all is well", "R", "Otherwise send nothing"),
+    ("new high-severity flags in the report", "R", "new high-severity flags (give counts and the top few, marked as unreviewed)"),
+    ("HTTPS or manifest failure in the report", "R", "an HTTPS or manifest failure on the live site"),
+)
+
+
+def duties_missing(master: str, routine: str) -> list[str]:
+    return [name for name, where, marker in DUTIES if marker not in (master if where == "M" else routine)]
+
+
+def test_every_duty_is_covered():
+    assert duties_missing(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")) == []
+
+
+def test_a_removed_duty_fails():
+    master, routine = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    for name, where, marker in DUTIES:
+        m = master.replace(marker, "") if where == "M" else master
+        r = routine.replace(marker, "") if where == "R" else routine
+        assert name in duties_missing(m, r)
+
+
+def order_ok(master: str) -> bool:
+    """Account guard before the first pull; guard again and POPIA check before the push; backup after the live check."""
+    i = master.find
+    guard0, fetch = i("**Account and origin guard.**"), i("git fetch -q origin")
+    guard4, popia, cmd = i("**Account and origin guard again.**"), i("**POPIA release check.**"), i(PUBLISH_CMD)
+    wrapper, backup = i(WRAPPER_CMD), i("**Back up state**")
+    return (master.count(PUBLISH_CMD) == 1 and min(guard0, fetch, guard4, popia, cmd, wrapper, backup) >= 0
+            and guard0 < fetch < guard4 < popia < cmd < wrapper < backup)
+
+
+def test_order_of_guard_check_publish_and_backup():
+    assert order_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_order_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    bads = (
+        good.replace("**Account and origin guard.**", "", 1),                       # no guard before the first pull
+        good.replace("**Account and origin guard again.**", "", 1),                 # no origin check before the push
+        good.replace("**POPIA release check.**", "", 1),                            # no POPIA check before the push
+        good.replace("**Back up state**", "", 1),                                   # no backup step
+        good.replace("   `cd /workspace/publicfunds && scripts/backup-state.sh",   # backup moved before the publish
+                     "   `cd /workspace/publicfunds && scripts/backup-state.sh", 1).replace(
+            "   Before the publish command, in this order (CHG-2026-066):\n",
+            "   **Back up state** first.\n   Before the publish command, in this order (CHG-2026-066):\n", 1).replace(
+            "   **Back up state** (CHG-2026-044", "   Backup (CHG-2026-044", 1),
+        good + "\n" + PUBLISH_CMD + "\n",                                          # a second publish command
+    )
+    for bad in bads:
+        assert bad != good
+        assert not order_ok(bad)
+
+
+def quiet_rule_ok(routine: str) -> bool:
+    prompt = routine_prompt(routine)
+    return ("send a report with SendToUser only when it has an ACTION line or there is a failure" in prompt
+            and "Otherwise send nothing" in prompt and "send one report" not in prompt.lower())
+
+
+def test_quiet_rule():
+    assert quiet_rule_ok(ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_quiet_rule_check_catches_bad_text():
+    good = ROUTINE.read_text(encoding="utf-8")
+    for bad in (good.replace("Otherwise send nothing", "Then send it", 1),
+                good.replace("When you send a report, put in it:", "At the end, send one report with SendToUser. Put in it:", 1)):
+        assert bad != good
+        assert not quiet_rule_ok(bad)
+
+
+def test_no_agent_id_or_other_account_in_committed_text():
+    import re
+    uuid = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    for f in (MASTER, ROUTINE, D / "README.md"):
+        t = f.read_text(encoding="utf-8")
+        assert not uuid.search(t), f
+    assert "<orchestrator agent id from the private deploy notes>" in routine_prompt(ROUTINE.read_text(encoding="utf-8"))
