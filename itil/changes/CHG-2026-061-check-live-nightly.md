@@ -284,3 +284,8 @@ Repo part (17 Nov 2026, local branch `chg-2026-061-nightly-check-live`, not push
 - `uv run pytest -q` (worktree, no warehouse), fix commit: **907 passed, 61 skipped, 0 failed** (first commit `e92d149d`: 892 passed, 61 skipped; baseline on `eebb4c44`: 865 passed, 61 skipped). This includes `tests/test_no_owner_quotes.py` and `tests/test_popia_names.py`, run again after the commit so that the new files are tracked.
 - No real publish, push or live check was run. `scripts/publish-public-data.sh` was not run.
 - Status: **built, not reviewed.** Needs two independent reviewer PASSes on the exact head and the owner's own GO naming that head before a push or merge. The routine and skill change needs its own owner GO after that.
+
+## Records carried in this branch
+
+- 17 Nov 2026: `origin/main` `de37f666` merged into this branch (merge only, no rebase). It brings in CHG-2026-063 (PR #12) and the 17 Nov 2026 nightly data commit `7cb9faf`. Conflicts in `itil/registers/change-log.md` and `itil/registers/ci-register.md` were resolved by keeping both sides (CHG-2026-061 row from this branch, CHG-2026-063 row from `main`; CI-116 and CI-117).
+- This branch records the CHG-2026-063 merge: PR #12, merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129`. Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Updated: the CHG-2026-063 record (status, environment, approval, outcome), its change-log row, CI-117 and `STATUS.md`.
