@@ -1,9 +1,9 @@
-# STATUS (as of 2026-11-15)
+# STATUS (as of 2026-11-17)
 
-## Current (15 Nov 2026)
+## Current (17 Nov 2026)
 
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
-- Live data build: B20261115T011932Z, generated 15 Nov 2026 03:20 SAST, `code_commit` `1c6ecda` (the 15 Nov 2026 nightly). After the PR #9 merge, `scripts/check_live.py` exited 0 at 20:06 SAST; the published data is still that nightly.
+- Live data build: B20261117T012014Z, generated 17 Nov 2026 03:20 SAST, `code_commit` `eebb4c4` (the 17 Nov 2026 nightly, data commit `7cb9faf`; data quality 58 pass, 1 warn, 0 fail). The nightly report said that the publish script committed but did not push, and that a push by hand was needed (as reported to the author; see CHG-2026-061, "Push detection").
 - PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change (see `changes/CAB-DECISION.md`). Owner GO by role and date; exact words are in the private approval record.
 - Merged and live:
   - CHG-2026-056 (PR #5, fuel history parser accepts a space as a thousands separator): merge `8cdf9ad6`, 13 Nov 2026 19:16 SAST, exact head `5db0c8c1`, tag `snapshot-2026-11-13-1917`. The 14 Nov nightly published the recovered November 2026 fuel row.
@@ -11,11 +11,13 @@
   - CHG-2026-058 (PR #7, records only): merge `bad8f256`, 15 Nov 2026 14:39 SAST, exact head `4cbdb22b`, tag `snapshot-2026-11-15-1439`. Docs only; no publish.
   - CHG-2026-059 (PR #8, number-format follow-ups for Q4 and Q5): merge `fc965467`, 15 Nov 2026 17:56 SAST, exact head `c6cea973`, tag `snapshot-2026-11-15-1756`. GitHub Pages build `1372205926` was built; `check_live` OK. A local rebuild on `main` (B20261115T155921Z, no publish) rewrote 325 of 349 flag explanations so reviews can start on the new wording. Live public data still has 0 confirmed flags. The 03:00 SAST nightly will publish next.
   - CHG-2026-060 (PR #9, records only): merge `8b4f72b8`, 15 Nov 2026 18:17 SAST, exact head `0243d3ed`, tag `snapshot-2026-11-15-1817`. GitHub Pages build `1372254306` was built; `check_live` OK at 20:06 SAST. Docs only; no publish. The close-out of this record is in PR #1 (CHG-2026-052).
+  - CHG-2026-052 to CHG-2026-055 (PR #1 to #4, docs only) and the CHG-2026-061 RFC (PR #10, docs only): merged 15 Nov 2026 21:25 to 21:26 SAST at the exact heads `549ed172`, `5e0bfb7f`, `2098adbd`, `cb3313c1` and `84590a20` (merges `9e9f62d6`, `c32c5814`, `c3ce8204`, `8193911e`, `ceabf997`). One tag for all five: `snapshot-2026-11-15-pr1-4-10`. The approvals for these merges are not in the author's records **[unverified]**. Recorded by CHG-2026-061.
 - INC-2026-004 is closed (14 Nov 2026) after the 14 Nov nightly succeeded. INC-2026-001 and INC-2026-002 remain mitigated (KE-001, KE-002). INC-2026-003 is still recorded as open.
 - Open PRs on GrokForum/publicfunds-sa:
-  - #1 (CHG-2026-052, docs only; also records the PR #9 merge): this PR, refreshed onto current `main`. Needs fresh reviews and an owner GO on the exact head.
-  - #2–#4 (CHG-2026-053 to CHG-2026-055, docs only): refreshed onto current `main`; each needs fresh reviews and an owner GO on its new exact head.
-- Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate: 58 pass, 1 warn (`award_buyer_match_rate_info`, 207 unmatched award-buyer rows), 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
+  - #11 (draft, CHG-2026-062, fruitless and wasteful expenditure metric, Phase 1, municipalities). Main `eebb4c44` is merged into it on a new local head that is not pushed. Needs reviews and an owner GO on the exact head.
+- Local branches, not pushed:
+  - `chg-2026-061-nightly-check-live` (CHG-2026-061 repo part: `scripts/nightly_check_live.py`, tests, docs follow-ups). Needs two reviewer PASSes and an owner GO on the exact head. The nightly routine and the skill are not changed; that needs a separate owner GO.
+- Known errors published with the live build (manifest `known_errors`): KE-001 to KE-015. Last-run data-quality gate (17 Nov 2026 nightly): 58 pass, 1 warn, 0 fail. Known gaps in the same manifest: KE-006, KE-007, KE-009, KE-003, KE-001, KE-012.
 - Gate: a further code or product change needs its own change record and an owner GO that names the exact head. The nightly data refresh remains the standing exception.
 
 ## History (as of 2026-10-23)

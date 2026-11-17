@@ -1,13 +1,14 @@
-# CHG-2026-061: Add check_live to the nightly refresh after a successful publish (RFC only)
+# CHG-2026-061: Add check_live to the nightly refresh after a successful publish
 
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-on to CSI-036, CHG-2026-032 and the CHG-2026-053 RFC (open PR #2). Drafted 15 Nov 2026. This record is not a merge GO and does not implement the step. |
-| Status | **RFC only.** Branch `feat/chg-2026-061-check-live-nightly`, open as draft PR #10, not merged. Do **not** edit the live skill, the repo skill copy, or the nightly routine prompt in this change. |
+| Status | RFC merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST, exact head `84590a20`). **Implementation, repo part only: built on the local branch `chg-2026-061-nightly-check-live` from `main` `eebb4c44` (17 Nov 2026). Not pushed. No PR.** The live skill, the repo skill copy and the nightly routine prompt are **not** changed. See "Implementation (repo part)". |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline / distribution). The later step, after an owner GO that names the exact head, changes the nightly routine. This RFC commit itself is docs only. |
 | Environment | Docs only in this change. Pre-change `main` is `8b4f72b80de0f31831bba689130a251488e791bd` (tag `snapshot-2026-11-15-1817`). The later implementation runs on the bot computer (live refresh skill and the nightly routine prompt) and updates the repo skill copy. Nothing is published by this RFC. |
 | CIs affected (this RFC) | `itil/changes/CHG-2026-061-check-live-nightly.md`, `itil/registers/change-log.md` |
-| CIs affected (later implementation, after the owner GO) | Live refresh skill; repo copy `docs/bot/skills/publicfunds-refresh/SKILL.md`; the nightly routine prompt; `itil/registers/csi-register.md` (CSI-036 status) |
+| CIs affected (repo part, this branch) | New `scripts/nightly_check_live.py` and `tests/test_nightly_check_live.py` (CI-116); this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
+| CIs affected (later step, after the owner GO) | Live refresh skill; repo copy `docs/bot/skills/publicfunds-refresh/SKILL.md`; the nightly routine prompt; `itil/registers/csi-register.md` (CSI-036 status) |
 | Linked records | CHG-2026-032 (script and RB-12), CHG-2026-053 (RFC draft, open PR #2), CSI-036, SLO-PD-1, RB-12, D-08 (still open; out of scope) |
 | Rollback | For this docs change: close it unmerged, or `git revert -m 1 <merge commit>` if it is later merged. Git is the rollback; no `.bkp` files. The later implementation rollback and the BREACH kill switch are quoted below, reused from CHG-2026-032, CHG-2026-053, RB-12 and CSI-036. |
 
@@ -83,10 +84,98 @@ If the live check exits 1, still run the current skill's health check (`curl -s 
 
 The repo copy and the live skill must be updated together, or the implementation note must state which one is the source of truth and how the other will be brought in line. Once that is done, update CSI-036 from "nightly routine step needs a separate owner GO" to delivered for the nightly step. Leave D-08 (external uptime check) open.
 
+## Implementation (repo part)
+
+Date: 17 Nov 2026 SAST. Branch `chg-2026-061-nightly-check-live`, from `main` `eebb4c44c82e47da2d8879e2af6b61287ed6cd68` (the 16 Nov 2026 nightly data commit). Approval to build: owner GO as relayed to the author (PublicFunds) by the orchestrator on 17 Nov 2026. That GO is for a local branch only. It is not a GO to push, to merge, or to change the routine.
+
+### What the branch adds
+
+- `scripts/nightly_check_live.py` (new, CI-116). A small wrapper around the RFC command. Standard library only. Read-only. It never runs the publish script and never pushes.
+  - Input: the exit code of `scripts/publish-public-data.sh --push` and a file with that run's saved output.
+  - It decides if the publish pushed (see "Push detection"). If not, it prints `check_live: SKIPPED (<reason>)` and exits 3. It does not run `check_live`.
+  - If the publish pushed, it runs the RFC command without change: `python3 scripts/check_live.py --expect-local public-data/v1/manifest.json --raw-url https://raw.githubusercontent.com/GrokForum/publicfunds-sa/main/public-data/v1/manifest.json --wait 600` (with the Python that runs the wrapper). It uses an overall time limit of 1,200 s, because RB-12 says to call the script under an overall timeout.
+  - It prints the `RESULT:` line and every `[BREACH]` and `[WARN]` line, then one `check_live:` line and one `NEXT:` line.
+  - check_live exit 0: wrapper exit 0. `NEXT:` says to report any `[WARN]` lines and carry on.
+  - check_live exit 1: wrapper exit 1. It says that this is a breach, not a success. It runs `curl -s http://127.0.0.1:8765/healthz` (30 s limit) and prints a `healthz:` line. `NEXT:` says to stop, not to re-publish, and to follow RB-12.
+  - check_live exit 2: wrapper exit 2. A failed check; nothing was checked. `NEXT:` says to stop. The wrapper does not run the health check here (the RFC asks for it only on exit 1).
+  - Any other exit code, a crash, or the time limit: wrapper exit 2 (failed check, stop). It is never reported as OK.
+  - A bad command line for the wrapper itself: exit 2 (failed check, stop).
+- `tests/test_nightly_check_live.py` (new, 27 tests). A fake runner stands in for `subprocess.run`, so no test uses the network, git push or the publish script. Two tests run the real `scripts/check_live.py` with no outside network: `--wait 3601` gives exit 2, and a closed local port gives a BREACH (exit 1) and the health-check line (a stub in place of curl).
+
+### Push detection (the publish script's push behaviour)
+
+`scripts/publish-public-data.sh` exits **0** in four cases. Only one of them is a push by the script:
+
+1. `--push`, committed and pushed: it prints `[publish-data HH:MM:SS SAST] pushed to origin/main`.
+2. No `--push`: it commits, prints `committed <sha>`, and exits 0 **without a push**.
+3. No change in `public-data/`: `nothing to commit`, exit 0.
+4. Only timestamps changed: `not committed`, exit 0.
+
+A failed push under `--push` is a non-zero exit (`set -e`), and a refused push is exit 4. So **exit 0 alone does not prove a push**. The wrapper uses the script's own log lines:
+
+- The `pushed to origin/main` line (at the start of a line, in the script's own `[publish-data ... SAST]` form) means pushed.
+- `nothing to commit` or `not committed` means not pushed: skip.
+- `committed <sha>` with no push line: the wrapper reads `origin/main` with `git ls-remote` (read-only). If it equals that commit (a push outside the script), the check runs, and the `check_live:` line says so. If not, or if git cannot answer: skip.
+- Exit code not 0, a missing or unreadable log, or no commit line: skip (fail closed).
+
+Finding for the reviewers and the owner. The nightly report of 17 Nov 2026 said that the publish script committed but did not push, and that a manual push was needed (as reported to the author; the author did not see that run). The local git reflog shows the 17 Nov data commit `7cb9faf` at 03:20:45 SAST and the `origin/main` tracking ref updated by a push at 03:21:05 SAST. The reflog cannot show if the script or a manual `git push` made that push. If the routine runs the script without `--push` and then pushes by hand, a check on the push line only would skip the live check on a night when new data did go live. The `git ls-remote` fallback covers that case. A better fix is that the routine always uses `--push` and never pushes by hand. That is a routine decision for the owner, not part of this branch.
+
+### Proposed routine and skill text (draft only; not applied)
+
+This replaces the block in "Exact text to add after the owner GO" for the later step. It needs two reviewer PASSes and the owner's own GO naming the exact head. Put it in the routine prompt, the live skill and the repo skill copy (`docs/bot/skills/publicfunds-refresh/SKILL.md`), after the publish step and before the review-app health check:
+
+```
+N. Publish, then check the live site:
+   `cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`
+   Read data/publish-run.log for the evidence_guard line and the publish result, as before.
+   Do not push by hand.
+   Then run: `python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`
+   - Put its RESULT: line, any [BREACH] / [WARN] lines, and its check_live:, healthz: and NEXT: lines in the nightly report.
+   - 0: OK, or WARN only. Report any [WARN] lines. The rest of the routine may finish.
+   - 1: at least one BREACH. A BREACH is reported as a breach, never as success. The wrapper has already run
+     the health check (curl -s http://127.0.0.1:8765/healthz); report its healthz: line. Then stop.
+     Do not re-run the publish to fix it. Follow RB-12.
+   - 2: a failed check (bad command line, crash or time limit; nothing was checked). Report it as a failed check
+     and stop. Do not treat it as OK.
+   - 3: skipped, because the publish did not push. Report the check_live: SKIPPED line. The publish rules
+     (exit 3, exit 4, evidence guard) still apply.
+```
+
+Two points need a decision before that step:
+
+- The live skill and the repo skill copy differ. The repo copy has the publish as step 4 and the health check as step 5. The live skill has no numbered publish step: its step 3 only says "when the routine publishes", and its step 4 is the health check. So the publish command is probably in the routine prompt **[unverified: the author did not read the routine prompt]**. The later step must say where the text goes and which copy is the source of truth (as the RFC already asks).
+- With `> data/publish-run.log`, the routine reads the `evidence_guard:` line from that file, not from the screen. The CHG-2026-041 rule (a missing line is UNKNOWN) stays the same.
+
+### Differences from the RFC
+
+1. The RFC said the later step changes only the skill and the routine text, and that tests do not change. This branch adds a wrapper script and its tests, as the relayed owner GO asked. `scripts/check_live.py` and `tests/test_check_live.py` are not changed.
+2. Push detection: the RFC says to skip if the publish did not push. Because exit 0 does not prove a push, the wrapper reads the script's log lines and, for a commit without a push line, compares `origin/main` with `git ls-remote`.
+3. The wrapper adds an overall time limit of 1,200 s (RB-12 asks for one). A time-out is a failed check (exit 2), not a BREACH.
+4. Any check_live exit code other than 0, 1 or 2 is a failed check (exit 2). The RFC names only 0, 1 and 2.
+5. The routine text in "Proposed routine and skill text" calls the wrapper, not `check_live.py` direct. The command that the wrapper runs is the RFC command, unchanged.
+
+### Rollback
+
+- Before a merge: delete the local branch. Nothing was pushed.
+- After a merge: `git revert -m 1 <merge commit>`. Nothing else in the repo calls the wrapper. `scripts/check_live.py` stays. Git is the rollback; no `.bkp` files.
+- Kill switch (CHG-2026-032 and RB-12): to turn the nightly step off, remove the added routine and skill text (write back the previous text). On a BREACH: report it as a breach, do not re-publish, follow RB-12.
+
+### Testing (repo part)
+
+See "Result". Live behaviour is not tested here: the RFC's scratch dry run after a real or rehearsed publish is for the later step.
+
+### Docs follow-ups in this branch (small, docs only)
+
+- KE-001 (`itil/knowledge/known-errors.md`): the "page 3" update was out of date. It now says that every eTenders OCDS run from 19 Oct to 17 Nov 2026 (39 runs in `data/raw/runs.jsonl`) was `partial`, each with HTTP 500 after 5 attempts on one delta page, and that the page changes (page 1 to page 7; page 5 on 12, 14, 15 and 16 Nov; page 4 on 17 Nov). The follow-up note said page 5; the run log shows that the page changes, so the text gives the range. KE-001 is in the published manifest, so the new text goes live with the first nightly after a merge.
+- CSI-009 (`itil/registers/csi-register.md`) and the CHG-2026-044 row in `itil/registers/change-log.md` and its Result line: they said "PR open, not merged". CHG-2026-044 was merged in the old private repository on 31 Oct 2026 19:39 SAST and is in the public tree since CHG-2026-051. The restore-check log on the box shows PASS on 1 Nov (two runs), 8 Nov and 15 Nov 2026. CSI-009 now says this. Closing CSI-009 is left to the owner.
+- CHG-2026-060 Rollback (`itil/changes/CHG-2026-060-close-059.md`, two places): "Close the PR unmerged" changed to the revert of the real merge `8b4f72b8`.
+- `STATUS.md` Current: brought up to 17 Nov 2026 (merges of PR #1 to #4 and #10, open draft PR #11, this local branch, current live data build).
+- The change-log rows for CHG-2026-052 to CHG-2026-055 and CHG-2026-061 said "Open PR, not merged". They now give the merges. This also records those merges (no separate records PR).
+
 ## Not changed
 
 - `scripts/check_live.py` behaviour, flags, or exit codes.
-- Tests, including `tests/test_check_live.py`.
+- Existing tests, including `tests/test_check_live.py`. (The repo part adds a new test file only.)
 - The standing nightly publish GO (data refresh only). Adding the check is a new ops step and needs its own implementation GO naming the exact head.
 - Detector logic, review decisions, `public-data/` contents, the dashboard, and RB-12 text.
 - D-08, offsite backup, and leftovers from CHG-2026-059.
@@ -160,6 +249,10 @@ The routine prompt change itself is done by the author after that GO. The exact 
 
 ## popia-review verdict: PASS
 
+Repo part (17 Nov 2026): new script, tests and docs text checked. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key. No person, supplier, account or agent is named. Role words only. No owner chat quotes. The only URLs are the public site, the public raw manifest and the local review-app health URL, which were already in the repo. Nothing was removed.
+
+RFC (15 Nov 2026):
+
 Docs-only RFC wording. No SA ID, passport, phone, email, address, account number, plate, precise location, credential or key. No person or supplier is named. Role words only; no owner or agent names; no owner chat quotes. Nothing was removed from the text.
 
 ## Seen, not touched
@@ -171,4 +264,11 @@ Docs-only RFC wording. No SA ID, passport, phone, email, address, account number
 
 ## Result
 
-RFC open as draft PR #10, not merged. Not implemented. The nightly routine, the skills, the scripts and the tests are unchanged by this commit.
+RFC: merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST). The approval for that merge is not in the author's records **[unverified]**.
+
+Repo part (17 Nov 2026, local branch `chg-2026-061-nightly-check-live`, not pushed):
+
+- `uv run pytest -q tests/test_nightly_check_live.py`: **27 passed**.
+- `uv run pytest -q` (worktree, no warehouse): **892 passed, 61 skipped, 0 failed** (baseline on `eebb4c44`: 865 passed, 61 skipped; the 27 more are the new tests). This includes `tests/test_no_owner_quotes.py` and `tests/test_popia_names.py`, run again after the commit so that the new files are tracked.
+- No real publish, push or live check was run. `scripts/publish-public-data.sh` was not run.
+- Status: **built, not reviewed.** Needs two independent reviewer PASSes on the exact head and the owner's own GO naming that head before a push or merge. The routine and skill change needs its own owner GO after that.
