@@ -104,7 +104,7 @@ INTRO = ("Two kinds of run: the nightly routine does steps 0 to 6, and step 4 is
          "(see step 4).\n\n")
 STEP4_FINAL_HEAD = (
     "4. **Nightly run only.** Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.\n"
-    "   On a run on request, skip this step: do not publish unless the owner asks for a publish.\n"
+    "   On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**.\n"
     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n")
 WRAPPER_CMD = "`python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`"
 MASTER_EDITS = (
@@ -120,7 +120,7 @@ MASTER_EDITS = (
      "The publish script prints one line starting `evidence_guard:`."),                                     # 4
     ("# PublicFunds refresh\n\n", "# PublicFunds refresh\n\n" + INTRO),                                       # 5
     ("Do not retry and do not edit data. Report to the owner at once:",
-     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Report to the owner at once:"),  # 6
+     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused` and put these first:"),  # 6
     ("   - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.\n",
      "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Stop after the wrapper and report. Do not retry.\n"
      "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
@@ -130,7 +130,7 @@ MASTER_EDITS = (
      "   - 3: skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push).\n"
      "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n"),  # 9
 )
-ON_REQUEST = "On a run on request, skip this step: do not publish unless the owner asks for a publish."
+ON_REQUEST = "On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**."
 
 
 def expected_master(draft: str) -> str:
@@ -198,8 +198,22 @@ def routine_prompt(text: str) -> str:
     return text.split(begin, 1)[1].split(end, 1)[0]
 
 
+def routine_file_ok(text: str) -> bool:
+    """The routine-prompt file names the publish script exactly once (in the rule that step 4 is the only publish)."""
+    return text.count("publish-public-data.sh") == 1
+
+
+def test_routine_file_names_the_publish_script_once():
+    good = ROUTINE.read_text(encoding="utf-8")
+    assert routine_file_ok(good)
+    bad = good.replace("- Never confirm or reject flags.\n",
+                       "- Never confirm or reject flags.\n- Then run `scripts/publish-public-data.sh --push`.\n", 1)
+    assert bad != good and not routine_file_ok(bad)                      # a second publish line fails
+
+
 def test_routine_prompt_matches_the_master():
     prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
+    assert "ACTION: publish refused" in prompt
     assert "publicfunds-refresh skill" in prompt and "steps 0 to 6" in prompt
     assert "This is the nightly run" in prompt and "the nightly-run path" in prompt
     assert "Step 4 of the skill is the only publish of the night" in prompt
