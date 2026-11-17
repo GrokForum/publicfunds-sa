@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))      # thusa.coverage_ceiling, wherever the script
 from thusa.coverage_ceiling import by_province, core_gap_lines, headline_context_lines, model, province_order  # noqa: E402
 PAGES = [("home", "#/"), ("coverage", "#/coverage"), ("municipalities", "#/municipalities"),
          ("municipality", "#/m/MUN:BUF"), ("departments", "#/departments"), ("department", None),
-         ("tenders", "#/tenders"), ("flags", "#/flags"), ("tools", "#/tools"), ("compare", "#/tools/compare?a=MUN:BUF&b=MUN:NMA&y=2024"),
+         ("fruitless-wasteful", "#/fw"), ("tenders", "#/tenders"), ("flags", "#/flags"), ("tools", "#/tools"), ("compare", "#/tools/compare?a=MUN:BUF&b=MUN:NMA&y=2024"),
          ("sources", "#/sources"), ("unknowns", "#/unknowns"), ("changes", "#/changes"), ("glossary", "#/glossary"), ("report-card", "#/m/MUN:BUF/card")]
 # Optional accessibility scan with axe-core (npm i axe-core); serious/critical WCAG 2.x A/AA violations fail the check.
 AXE_JS = next((Path(x) for x in (os.environ.get("AXE_JS", ""), "/workspace/tools/web/node_modules/axe-core/axe.min.js",
@@ -34,7 +34,7 @@ VIEWPORTS = {"desktop": {"width": 1366, "height": 900}, "mobile": {"width": 390,
 OLD_HEADERS = ("Irregular & wasteful spending", "Budget", "Audited actuals", "Audit opinion", "Tender awards")
 PROVINCES = {"EC": "Eastern Cape", "FS": "Free State", "GT": "Gauteng", "KZN": "KwaZulu-Natal", "LP": "Limpopo", "MP": "Mpumalanga",
              "NC": "Northern Cape", "NW": "North West", "WC": "Western Cape"}          # mirror of PROVINCES in index.html
-ROUTES = [r"^#?/?$", r"^#/coverage$", r"^#/municipalities$", r"^#/m/.+$", r"^#/departments$", r"^#/d/.+$", r"^#/tenders$", r"^#/flags$",
+ROUTES = [r"^#?/?$", r"^#/coverage$", r"^#/municipalities$", r"^#/m/.+$", r"^#/departments$", r"^#/d/.+$", r"^#/fw$", r"^#/tenders$", r"^#/flags$",
           r"^#/tools(?:/\w+)?$", r"^#/sources$", r"^#/unknowns$", r"^#/changes$", r"^#/glossary$"]   # mirror of `routes` in index.html
 # CHG-2026-034: state wording on the report card and the glossary says "not available", not "not published". "published" stays where it is
 # about an official source or this site's own release (attribution, "Data published <date>", "confirmed, published flags").
