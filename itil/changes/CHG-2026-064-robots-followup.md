@@ -3,12 +3,12 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
-| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then this record update. The branch result is variant A. Draft PR #14 was opened 17 Nov 2026 11:51 SAST by the orchestrator at head `cecd6503`. |
+| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then the record updates `cecd6503` and `5a4eab3d`. The branch result is variant A. Draft PR #14 was opened 17 Nov 2026 11:51 SAST by the orchestrator at head `cecd6503`. PR #13 (CHG-2026-061) was merged to `main` before this change, as `e5fbfa58` (17 Nov 2026 15:46 SAST, exact head `7a7cd868`, rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`). The branch then merged `main` `e5fbfa58` (no rebase); see "Merge notes". |
 | Decision | **Variant A** (keep `Disallow: /`), chosen by the owner on 17 Nov 2026, as reported to the author (PublicFunds). Variant B was made as commit `ea449394` and reverted by commit `b3cb0ea8` (`git revert ea449394`). |
 | Type | **Standard** (records only). The net change from `de37f666` does not change `robots.txt`, the HTML pages, the tests or the CI register. Variant B (Normal-high: hosting / distribution) was reverted on the branch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
 | CIs affected | None (records only: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`). Commit B touched CI-117 (`robots.txt` and its register row) and `tests/test_robots_noindex.py`; the revert put them back as on `main`. |
-| Linked records | CHG-2026-063 (PR #12, merge `de37f666`), CI-117, CI-111, CHG-2026-061 (PR #13 also edits the CHG-2026-063 record lines; see "Merge notes") |
+| Linked records | CHG-2026-063 (PR #12, merge `de37f666`), CI-117, CI-111, CHG-2026-061 (PR #13, merge `e5fbfa58`, also edited the CHG-2026-063 record lines; see "Merge notes") |
 | Rollback | Before a merge: delete the branch. After a merge: `git revert -m 1 <merge commit>`. To try variant B later: a new change record that reapplies commit `ea449394`. Git is the rollback; no `.bkp` files. |
 
 ## Goal
@@ -53,13 +53,15 @@
 
 ## Merge notes (PR #13, CHG-2026-061)
 
-The PR #13 branch also changes `STATUS.md`, the change-log and the CHG-2026-063 record. The conflicts cannot be avoided. A test merge with `git merge-tree` (17 Nov 2026, this branch against PR #13 head `7a7cd868`, and the reverse) gives 5 conflict blocks in 3 files in either order: `STATUS.md` (1), the CHG-2026-063 record (3: Status row; Reviewer rows; Outcome and Process note) and `itil/registers/change-log.md` (1).
+The PR #13 branch also changed `STATUS.md`, the change-log and the CHG-2026-063 record. A test merge with `git merge-tree` (17 Nov 2026, this branch against PR #13 head `7a7cd868`, and the reverse) gave 5 conflict blocks in 3 files in either order: `STATUS.md` (1), the CHG-2026-063 record (3: Status row; Reviewer rows; Outcome and Process note) and `itil/registers/change-log.md` (1).
 
-- Order: PR #13 merges first.
-- After PR #13 merges, this branch gets a merge of `main` (no rebase) and resolves the conflicts:
-  - `STATUS.md`: keep the PR #13 block as it is on `main`, and add the CHG-2026-064 line;
-  - the CHG-2026-063 record and `itil/registers/change-log.md`: take the CHG-2026-064 wording (it records the reviews outside GitHub and does not depend on PR #13 being merged).
-- Older current-state lines on `main` (for example "Open PRs" in `STATUS.md`, "open PR #2" and "draft PR #10, not merged" in the CHG-2026-061 record, and the change-log rows of CHG-2026-044, CHG-2026-052 to CHG-2026-055 and CHG-2026-061) are corrected by PR #13. This branch does not change them, so that it adds no more conflicts.
+- PR #13 merged first: merge `e5fbfa58`, 17 Nov 2026 15:46 SAST, exact head `7a7cd868`.
+- This branch then merged `main` `e5fbfa58` (`git merge origin/main`, no rebase). The merge had the same 5 conflict blocks in 3 files. The resolution:
+  - `STATUS.md`: the block from `main` as it is, then the CHG-2026-064 line;
+  - the CHG-2026-063 record (3 blocks): the CHG-2026-064 wording (merged in PR #12 at exact head `3c93c88d`, merge `de37f666`; reviews outside GitHub). It does not depend on PR #13;
+  - `itil/registers/change-log.md` (1 block): the CHG-2026-061 row as on `main`, then the CHG-2026-063 row with the CHG-2026-064 wording and the CHG-2026-064 row.
+- After the merge, `robots.txt` (`User-agent: *` / `Disallow: /`, variant A), the tests and `itil/registers/ci-register.md` are identical to `main` `e5fbfa58`.
+- Older current-state lines on `main` were corrected by PR #13. This branch does not change them.
 
 ## Stays the same
 
@@ -73,6 +75,7 @@ The PR #13 branch also changes `STATUS.md`, the change-log and the CHG-2026-063 
 - Commit A (`1742336b`): `uv run pytest -q` 871 passed, 61 skipped; robots and guard tests 12 passed.
 - Commit B (`ea449394`): `uv run pytest -q` 871 passed, 61 skipped; robots and guard tests 12 passed; `dashboard_check` exit 0, 0 problems.
 - After the revert and this record update: same tests as commit A (results in the commit report to the reviewer).
+- After the merge of `main` `e5fbfa58` (17 Nov 2026): `uv run pytest -q` 917 passed, 61 skipped (the PR #13 tests are now included).
 
 ## Approval
 

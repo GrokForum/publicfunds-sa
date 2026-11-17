@@ -87,3 +87,5 @@ These steps change bot config. This change does not apply them.
 > **Restore check.** Run `scripts/restore-check.sh`. Report the PASS or FAIL line. If the result is FAIL, or the exit code is not 0, begin the report with `ACTION: restore check failed`. Quote the line. Do not delete any backup. Do not change any file in the repo.
 
 Result: PR open, not merged; no owner GO.
+
+Update 17 Nov 2026 (CHG-2026-061 docs follow-up): merged in the old private repository on 31 Oct 2026 19:39 SAST; in the public tree since CHG-2026-051. The restore-check log on the box shows PASS on 1 Nov (two runs), 8 Nov and 15 Nov 2026.
