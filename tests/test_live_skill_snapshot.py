@@ -94,17 +94,43 @@ def test_extra_text_in_the_draft_fails():
 # CHG-2026-065: master copy of the live skill, the routine prompt, and the drift check.
 
 # The exact edits that make the CHG-2026-061 draft final. No other change is allowed.
+# 9 edits. Edits 1 to 4 hold the 5 edits of the first CHG-2026-065 commit (the two step-4 head lines are now one
+# edit, and edit 3 now also moves the wrapper command up). Edits 5 to 9 and the new step-4 lines are the follow-up
+# of 17 Nov 2026: step 4 runs on the nightly run only (owner decision, as reported to the author (PublicFunds)),
+# the wrapper runs after every publish, whatever the exit code, and the exit 3 and exit 4 wording matches
+# scripts/nightly_check_live.py.
+INTRO = ("Two kinds of run: the nightly routine does steps 0 to 6, and step 4 is its only publish. A run on request "
+         "does steps 0 to 3 and then 5 and 6, and reports; it does not publish unless the owner asks for a publish "
+         "(see step 4).\n\n")
+STEP4_FINAL_HEAD = (
+    "4. **Nightly run only.** Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.\n"
+    "   On a run on request, skip this step: do not publish unless the owner asks for a publish.\n"
+    "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n")
+WRAPPER_CMD = "`python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`"
 MASTER_EDITS = (
-    (COMMENT, ""),
-    ("4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.\n",
-     "4. Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.\n"),
-    ("   This step replaces the publish in the nightly routine prompt. The routine prompt must not publish again (one publish per night).\n",
-     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n"),
+    (COMMENT, ""),                                                                                            # 1
+    ("4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.\n"
+     "   This step replaces the publish in the nightly routine prompt. The routine prompt must not publish again (one publish per night).\n",
+     STEP4_FINAL_HEAD),                                                                                        # 2
     ("   Read data/publish-run.log for the evidence_guard line and the publish result. Do not push by hand.\n",
-     "   Always use `--push`. Do not push by hand. Read data/publish-run.log for the evidence_guard line and the publish result.\n"),
+     "   Always use `--push`. Do not push by hand. Read data/publish-run.log for the evidence_guard line and the publish result.\n"
+     "   Then, whatever the publish exit code, run the live check wrapper. It only reads; it never publishes or pushes:\n"
+     "   " + WRAPPER_CMD + "\n"),                                                                                # 3
     ("When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`.",
-     "The publish script prints one line starting `evidence_guard:`."),
+     "The publish script prints one line starting `evidence_guard:`."),                                     # 4
+    ("# PublicFunds refresh\n\n", "# PublicFunds refresh\n\n" + INTRO),                                       # 5
+    ("Do not retry and do not edit data. Report to the owner at once:",
+     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Report to the owner at once:"),  # 6
+    ("   - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.\n",
+     "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Stop after the wrapper and report. Do not retry.\n"
+     "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
+    ("   Then run: " + WRAPPER_CMD + "\n", "   The wrapper's exit code:\n"),                                 # 8
+    ("   - 3: skipped, because it is clear that the publish did not push. Report the check_live: SKIPPED line.\n"
+     "     The publish rules (exit 3, exit 4, evidence guard) still apply.\n",
+     "   - 3: skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push).\n"
+     "     check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply.\n"),  # 9
 )
+ON_REQUEST = "On a run on request, skip this step: do not publish unless the owner asks for a publish."
 
 
 def expected_master(draft: str) -> str:
@@ -125,7 +151,7 @@ def master_structure_ok(text: str) -> bool:
         return False
     before = "\n".join(lines[:s4])
     step4 = "\n".join(lines[s4:s5])
-    return (lines[s4].startswith("4. Only if step 1 returned **0**: publish")
+    return (lines[s4].startswith("4. **Nightly run only.** Only if step 1 returned **0**: publish")
             and s4 < cmd < s5
             and text.count("publish-public-data.sh") == 1
             and "--push" in lines[cmd]
@@ -143,6 +169,7 @@ def test_live_snapshot_is_byte_exact_to_its_sha256():
 
 
 def test_master_is_the_draft_made_final():
+    assert len(MASTER_EDITS) == 9
     assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
 
 
@@ -155,7 +182,7 @@ def test_master_structure_check_catches_bad_text():
     assert master_structure_ok(good)
     bads = (
         good.replace("publish-public-data.sh --push >", "publish-public-data.sh >", 1),            # no --push
-        good.replace("4. Only if step 1 returned **0**: publish", "4. Publish", 1),                  # gate dropped
+        good.replace("Only if step 1 returned **0**: publish", "Publish", 1),                        # gate dropped
         good.replace("3. Report briefly", "3. Run `scripts/publish-public-data.sh --push`. Report briefly", 1),  # publish before step 4
         good.replace("3. Report briefly", "3. Read the evidence_guard line. Report briefly", 1),      # publish wording before step 4
         good.replace("6. Never confirm", "6. **[DRAFT]** Never confirm", 1),                          # draft marker left in
@@ -174,6 +201,7 @@ def routine_prompt(text: str) -> str:
 def test_routine_prompt_matches_the_master():
     prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
     assert "publicfunds-refresh skill" in prompt and "steps 0 to 6" in prompt
+    assert "This is the nightly run" in prompt and "the nightly-run path" in prompt
     assert "Step 4 of the skill is the only publish of the night" in prompt
     assert "only if step 1 returned 0" in prompt and "Always use `--push`" in prompt
     assert "Do not run the publish script at any other point" in prompt
@@ -189,3 +217,43 @@ def test_live_skill_has_not_drifted():
         pytest.skip("live skill path is not on this computer")
     live = LIVE_PATH.read_bytes()
     assert live in (MASTER.read_bytes(), LIVE.read_bytes()), "live skill differs from the master and the snapshot"
+
+
+def on_request_rule_ok(text: str) -> bool:
+    """Step 4 publishes on the nightly run only; a run on request does not publish unless the owner asks."""
+    lines = text.splitlines()
+    s4 = next((i for i, l in enumerate(lines) if l.startswith("4. ")), None)
+    if s4 is None:
+        return False
+    return (lines[s4].startswith("4. **Nightly run only.**")
+            and lines[s4 + 1].strip() == ON_REQUEST
+            and "it does not publish unless the owner asks for a publish" in "\n".join(lines[:s4]))
+
+
+def test_master_publishes_on_the_nightly_run_only():
+    assert on_request_rule_ok(MASTER.read_text(encoding="utf-8"))
+
+
+def test_on_request_rule_check_catches_bad_text():
+    good = MASTER.read_text(encoding="utf-8")
+    for bad in (good.replace("   " + ON_REQUEST + "\n", "", 1),                                    # on-request line dropped
+                good.replace("4. **Nightly run only.** ", "4. ", 1),                               # nightly-only marker dropped
+                good.replace("it does not publish unless the owner asks", "it publishes", 1)):    # intro says it publishes
+        assert bad != good
+        assert not on_request_rule_ok(bad)
+
+
+def test_wrapper_runs_after_every_publish_and_matches_its_exit_codes():
+    """The wrapper runs whatever the publish exit code; the skill's exit 3 and 4 wording matches the script."""
+    t = MASTER.read_text(encoding="utf-8")
+    assert t.count(WRAPPER_CMD) == 1
+    assert "Then, whatever the publish exit code, run the live check wrapper." in t
+    assert t.index(PUBLISH_CMD) < t.index(WRAPPER_CMD) < t.index("If the publish script exits **3**")
+    assert t.count("The wrapper prints `check_live: SKIPPED` and exits 3.") == 2      # publish exit 3 and exit 4
+    assert "It prints `check_live: FAILED CHECK` and exits 2." in t                    # any other non-zero publish exit
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ncl", D.parent.parent.parent / "scripts" / "nightly_check_live.py")
+    ncl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ncl)
+    assert ncl.publish_pushed(3, "")[0] == ncl.NOT_PUSHED and ncl.publish_pushed(4, "")[0] == ncl.NOT_PUSHED
+    assert ncl.publish_pushed(5, "")[0] == ncl.UNKNOWN

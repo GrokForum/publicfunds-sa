@@ -2,17 +2,17 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | Owner decisions, 17 Nov 2026, as reported to the author (PublicFunds) by the orchestrator: (a) the nightly routine always publishes by itself with `--push`, as CHG-2026-061 step 4, and step 4 runs only if step 1 returned 0; (b) the repo copy in `docs/bot/live-skill/` is the master, and the live skill is deployed from it. Exact words are in the private approval record. This record is not a merge GO and not a deploy GO. |
-| Status | Built in DEV on branch `chg-2026-065-skill-repo-master` from `main` `e5fbfa58` (17 Nov 2026; the merge of PR #13, CHG-2026-061, exact head `7a7cd868`, 15:46 SAST; rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`). |
+| Requested by / date (SAST) | Owner decisions, 17 Nov 2026, as reported to the author (PublicFunds) by the orchestrator: (a) the nightly routine always publishes by itself with `--push`, as CHG-2026-061 step 4, and step 4 runs only if step 1 returned 0; (b) the repo copy in `docs/bot/live-skill/` is the master, and the live skill is deployed from it. A further owner decision, 17 Nov 2026, as reported to the author (PublicFunds): (c) step 4 publishes on the nightly run only; a refresh run on request reports and publishes only if the owner asks for a publish. Exact words are in the private approval record. This record is not a merge GO and not a deploy GO. |
+| Status | Built in DEV on branch `chg-2026-065-skill-repo-master` from `main` `e5fbfa58` (17 Nov 2026; the merge of PR #13, CHG-2026-061, exact head `7a7cd868`, 15:46 SAST; rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`; post-merge tag `snapshot-2026-11-17-1546` on `e5fbfa58`, pushed by the author on 17 Nov 2026; `check_live` OK at 15:55 SAST). First commit `6183fe19`; a follow-up commit adds decision (c), the exit 3 and exit 4 wording of step 4, and the PR #13 merge records. |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline). After the deploy, the nightly routine publishes from skill step 4. A merge needs two reviewer PASSes on the exact head and the owner's GO naming that head. The deploy follows the merge (see "Deploy"). |
 | Environment | DEV (local worktree). Pre-change `main` is `e5fbfa58644f48f1ba01b718d3b9ced0d270dda2`. The merge changes only repo files; GitHub Pages serves them as plain files. The live skill and the routine prompt are outside git and change only at the deploy. |
-| CIs affected | New CI-118 (master copy of the live refresh skill and the nightly routine prompt text, `docs/bot/live-skill/`); `tests/test_live_skill_snapshot.py`; this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md`. At the deploy: the live refresh skill and the nightly routine prompt (CI-004). |
+| CIs affected | New CI-118 (master copy of the live refresh skill and the nightly routine prompt text, `docs/bot/live-skill/`); `tests/test_live_skill_snapshot.py`; this record; the CHG-2026-061 record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md`. At the deploy: the live refresh skill and the nightly routine prompt (CI-004). |
 | Linked records | CHG-2026-061 (PR #13, merge `e5fbfa58`: `scripts/nightly_check_live.py` (CI-116), the live-skill snapshot and the draft step), CHG-2026-041 (publish guard line), CHG-2026-025 (step 0), CSI-036, RB-12, CI-070 (template skills) |
 | Rollback | See "How to revert". Git is the rollback for the repo; no `.bkp` files. |
 
 ## What and why
 
-CHG-2026-061 added the after-publish live check as a draft skill step and left three owner decisions open. The owner decided two of them on 17 Nov 2026 (as reported to the author (PublicFunds)): the routine always publishes with `--push`, from step 4, only if step 1 returned 0; and the repo copy is the master of the live skill. This change makes the master file, the routine prompt that goes with it, the deploy and drift-check steps, and tests.
+CHG-2026-061 added the after-publish live check as a draft skill step and left three owner decisions open. The owner decided two of them on 17 Nov 2026 (as reported to the author (PublicFunds)): the routine always publishes with `--push`, from step 4, only if step 1 returned 0; and the repo copy is the master of the live skill. This change makes the master file, the routine prompt that goes with it, the deploy and drift-check steps, and tests. It also records the merge of PR #13 (CHG-2026-061) in the CHG-2026-061 record, its change-log row and `STATUS.md`.
 
 ## Changes
 
@@ -24,24 +24,37 @@ CHG-2026-061 added the after-publish live check as a draft skill step and left t
 | `tests/test_live_skill_snapshot.py` | Tests added for the master, the routine prompt, the snapshot sha256 and the drift check. The CHG-2026-061 tests are unchanged. |
 | `itil/registers/ci-register.md` | New row CI-118. |
 | `itil/registers/change-log.md`, `STATUS.md` | One new row and one new line. |
+| `itil/changes/CHG-2026-061-check-live-nightly.md`, its change-log row, its `STATUS.md` line | The PR #13 merge: merge `e5fbfa58644f48f1ba01b718d3b9ced0d270dda2`, 17 Nov 2026 15:46 SAST, exact head `7a7cd868`, owner GO as reported to the author (PublicFunds); rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`; post-merge tag `snapshot-2026-11-17-1546` on `e5fbfa58`, pushed by the author on 17 Nov 2026; `check_live` OK at 15:55 SAST (the author ran it again at 15:56 SAST: RESULT OK, build B20261117T012014Z). The reviewer PASSes on `7a7cd868` are not in the author's records **[unverified]**. |
 
 `publicfunds-refresh.LIVE-2026-11-17.md` (the live skill before this change, sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`) and `publicfunds-refresh.PROPOSED-CHG-2026-061.md` stay as history. The snapshot is the rollback text. On 17 Nov 2026 the live skill on the bot computer had that sha256 (checked with `sha256sum` and `cmp`).
 
 ### Master text compared with the live skill of 17 Nov 2026
 
-The master is the CHG-2026-061 draft with these 5 edits and no others (`tests/test_live_skill_snapshot.py`, `MASTER_EDITS`):
+The master is the CHG-2026-061 draft with these 9 edits and no others (`tests/test_live_skill_snapshot.py`, `MASTER_EDITS`; the first commit `6183fe19` had 5 edits):
 
 1. The DRAFT comment after the frontmatter is removed.
-2. Step 4, first line: the `[DRAFT ...]` marker is removed. It now says "Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish."
-3. Step 4, second line: "This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself."
-4. Step 4, fourth line: "Always use `--push`. Do not push by hand." comes first, then the line about `data/publish-run.log`.
-5. Publish guard bullet: "When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints ..." becomes "The publish script prints ...". The bullet is in step 4, after the publish command.
+2. The first two lines of step 4 are replaced. Step 4 now starts: "**Nightly run only.** Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish." Then: "On a run on request, skip this step: do not publish unless the owner asks for a publish." Then: "This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself."
+3. After the publish command: "Always use `--push`. Do not push by hand." comes first, then the line about `data/publish-run.log`, then "Then, whatever the publish exit code, run the live check wrapper. It only reads; it never publishes or pushes:" and the wrapper command.
+4. Publish guard bullet: "When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints ..." becomes "The publish script prints ...".
+5. A new line after the title: the nightly routine does steps 0 to 6 and step 4 is its only publish; a run on request does steps 0 to 3, then 5 and 6, and reports, and does not publish unless the owner asks for a publish.
+6. Publish exit 3 bullet: adds "The wrapper prints `check_live: SKIPPED` and exits 3."
+7. The exit 4 line becomes two bullets. Exit 4: nothing was pushed; the wrapper prints `check_live: SKIPPED` and exits 3; stop after the wrapper and report; do not retry. Any other non-zero publish exit: the wrapper cannot tell if the publish pushed; it prints `check_live: FAILED CHECK` and exits 2; stop and report, and check by hand if new data went live; do not retry.
+8. "Then run: <wrapper command>" becomes "The wrapper's exit code:" (the command moved up, see edit 3).
+9. Wrapper exit 3: "skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push). check_live was not run. Report the check_live: SKIPPED line. The publish rules above still apply."
 
-Compared with the live skill, the master therefore: says "skip steps 1 to 6" in step 0; keeps only the first line of step 3; adds step 4 (the publish command with `--push`, the publish guard bullet and the exit 3 and exit 4 bullets moved from step 3 without change, then `scripts/nightly_check_live.py` and its exit codes 0 to 3); renumbers the health check to step 5 and "Never confirm or reject" to step 6.
+Compared with the live skill, the master therefore: adds the line about the two kinds of run; says "skip steps 1 to 6" in step 0; keeps only the first line of step 3; adds step 4 (nightly run only: the publish command with `--push`, the wrapper command, the publish guard bullet, the exit 3 and exit 4 bullets moved from step 3 with the wrapper results added, a bullet for any other non-zero exit, then the wrapper exit codes 0 to 3); renumbers the health check to step 5 and "Never confirm or reject" to step 6.
+
+### Why the wrapper runs after every publish exit code
+
+`scripts/nightly_check_live.py` (`publish_pushed`) treats publish exit 3 and 4 as a refusal: it prints `check_live: SKIPPED`, does not run `check_live` and exits 3. It reads nothing from the network in that case. For any other non-zero publish exit it cannot tell if the publish pushed: it prints `check_live: FAILED CHECK` and exits 2, and tells the operator to check by hand if new data went live. Running the wrapper every time is therefore safe (it only reads; it never publishes or pushes) and safer than skipping it: an unexpected exit code after a partial push gets a FAILED CHECK line instead of no line, and the nightly report always has a `check_live:` line. The CHG-2026-061 draft said "stop and report" for exit 4 before the wrapper line, which could be read either way; the master now says it clearly.
+
+### Run on request (decision (c))
+
+The skill is used by the nightly routine and on request. Before decision (c), the draft wording meant that a run on request would publish in step 4 when step 1 returned 0. The master now says that step 4 is for the nightly run only. A run on request does steps 0 to 3, reports, and does steps 5 and 6. It publishes only if the owner asks for a publish. Steps 5 (review-app health check) and 6 (never confirm or reject flags) still apply to a run on request, because they do not publish.
 
 ### Routine prompt
 
-The author cannot read the routine prompt, and the repo has no copy of the current prompt (CHG-2026-061 marks it **[unverified]**). `routine-nightly.PROPOSED.md` is therefore written in full from the master skill. It is not an edit of the current prompt. The prompt runs the skill steps 0 to 6, says that step 4 is the only publish, gives no publish command line of its own, and lists the items of the final report. The routine prompt and the live skill change in the same step: with the new skill and the old prompt, the night could publish twice; with the new prompt and the old skill, the night does not publish.
+The author cannot read the routine prompt, and the repo has no copy of the current prompt (CHG-2026-061 marks it **[unverified]**). `routine-nightly.PROPOSED.md` is therefore written in full from the master skill. It is not an edit of the current prompt. The prompt says that this is the nightly run, runs the skill steps 0 to 6 on the nightly-run path, says that step 4 is the only publish (the wrapper runs whatever the publish exit code), gives no publish command line of its own, and lists the items of the final report. The routine prompt and the live skill change in the same step: with the new skill and the old prompt, the night could publish twice; with the new prompt and the old skill, the night does not publish.
 
 ## Deploy (after the merge)
 
@@ -57,10 +70,12 @@ Done by the orchestrator, only after two reviewer PASSes on the exact head, the 
 - `tests/test_live_skill_snapshot.py`:
   - the snapshot is byte-exact to its sha256;
   - the master is exactly the draft with the 5 edits;
-  - structure of the master: step 4 starts "Only if step 1 returned **0**: publish"; the publish command (with `--push`) is the only mention of `publish-public-data.sh` and is in step 4; no publish, `evidence_guard`, `--push` or `nightly_check_live` wording before step 4, and no guard or check wording in step 4 before the publish command; no DRAFT marker. A negative test changes the text in 5 ways and checks that each fails;
-  - the routine prompt: runs the skill steps 0 to 6, says that step 4 is the only publish, always `--push`, no push by hand, and has no publish command line of its own;
+  - structure of the master: step 4 starts "**Nightly run only.** Only if step 1 returned **0**: publish"; the publish command (with `--push`) is the only mention of `publish-public-data.sh` and is in step 4; no publish, `evidence_guard`, `--push` or `nightly_check_live` wording before step 4, and no guard or check wording in step 4 before the publish command; no DRAFT marker. A negative test changes the text in 5 ways and checks that each fails;
+  - decision (c): step 4 starts "**Nightly run only.**", its next line is the run-on-request rule, and the line after the title says a run on request does not publish unless the owner asks. A negative test drops each of these in turn and checks that each fails;
+  - the wrapper: its command is in step 4 once, after the publish command and before the exit bullets; the exit 3 and exit 4 bullets say SKIPPED / exit 3 and the other-exit bullet says FAILED CHECK / exit 2; and `publish_pushed` in `scripts/nightly_check_live.py` gives NOT_PUSHED for publish exit 3 and 4 and UNKNOWN for exit 5;
+  - the routine prompt: says that this is the nightly run, runs the skill steps 0 to 6 on the nightly-run path, says that step 4 is the only publish, always `--push`, no push by hand, and has no publish command line of its own;
   - drift check: when `/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md` exists, it must be equal to the master or to the 17 Nov 2026 snapshot. When the path does not exist (CI, other computers), the test is skipped.
-- `uv run pytest -q` on this branch, 17 Nov 2026 (no warehouse in the worktree): 923 passed, 61 skipped (`main` `e5fbfa58`: 917 passed, 61 skipped; 6 new tests). The drift check ran on the bot computer and passed (the live skill is equal to the 17 Nov 2026 snapshot).
+- `uv run pytest -q` on this branch, 17 Nov 2026 (no warehouse in the worktree): first commit `6183fe19`: 923 passed, 61 skipped (`main` `e5fbfa58`: 917 passed, 61 skipped; 6 new tests). Follow-up commit: 926 passed, 61 skipped (3 more tests). The drift check ran on the bot computer and passed (the live skill is equal to the 17 Nov 2026 snapshot).
 
 ## Risk assessment
 
@@ -77,16 +92,15 @@ Done by the orchestrator, only after two reviewer PASSes on the exact head, the 
 
 ## Seen, not touched
 
-- The CHG-2026-061 record, its change-log row and the `STATUS.md` line for PR #13 still describe PR #13 as a draft. A records change can state its merge (`e5fbfa58`).
 - CI-116 status says "not in the nightly routine". That stays true until the deploy; the deploy record can update it.
 - The template skill `docs/bot/skills/publicfunds-refresh/SKILL.md` (CI-070) differs from the master. Whether it follows the master is a later decision.
-- The skill is also used "on request". With the master, a run on request publishes in step 4 when step 1 returns 0, as the nightly does. This is the CHG-2026-061 draft wording, not a new rule.
+- The CHG-2026-061 record still has older history lines that name draft PR #13 (for example "Result" and "Review of head `72d84812`"). They are past-tense facts and stay as they are.
 
 ## Approval
 
 | Role | Name | Commit approved | Date |
 |---|---|---|---|
-| Change authority | owner | decisions (a) and (b), as reported to the author (PublicFunds); not a merge GO | 17 Nov 2026 |
+| Change authority | owner | decisions (a), (b) and (c), as reported to the author (PublicFunds); not a merge GO | 17 Nov 2026 |
 | Reviewer 1 | reviewer | | |
 | Reviewer 2 | reviewer | | |
 

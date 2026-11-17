@@ -4,7 +4,7 @@ The master copy of the live `publicfunds-refresh` skill is in this folder (CHG-2
 
 | File | What it is |
 |---|---|
-| `publicfunds-refresh.MASTER.md` | **Master.** The text of the live skill. It is the CHG-2026-061 draft made final: step 4 publishes with `--push` every time, only if step 1 returned 0, and then runs `scripts/nightly_check_live.py`. The publish wording is all in step 4, after the publish command. |
+| `publicfunds-refresh.MASTER.md` | **Master.** The text of the live skill. It is the CHG-2026-061 draft made final: step 4 runs on the nightly run only; it publishes with `--push` every time, only if step 1 returned 0, and then runs `scripts/nightly_check_live.py` whatever the publish exit code. A run on request does not publish unless the owner asks for a publish. The publish wording is all in step 4, after the publish command. |
 | `routine-nightly.PROPOSED.md` | The nightly routine prompt that goes with the master. The prompt runs the skill and does not publish by itself. Deploy it together with the master. |
 | `publicfunds-refresh.LIVE-2026-11-17.md` | History and rollback text. A byte-for-byte copy of the live skill of 17 Nov 2026, before CHG-2026-065 (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`). Do not edit it. |
 | `publicfunds-refresh.PROPOSED-CHG-2026-061.md` | History. The CHG-2026-061 draft (merged in PR #13). The master replaced it. Do not edit it. |
