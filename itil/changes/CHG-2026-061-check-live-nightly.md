@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-on to CSI-036, CHG-2026-032 and the CHG-2026-053 RFC (PR #2, merged 15 Nov 2026). RFC drafted 15 Nov 2026. Repo part built 17 Nov 2026 on branch `chg-2026-061-nightly-check-live` (owner GO for the CHG-061 build and the PR #11 fold, 17 Nov 2026, as reported to the author (PublicFunds)). This record is not a merge GO. |
-| Status | RFC merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST, exact head `84590a20`). **Implementation, repo part only: built on branch `chg-2026-061-nightly-check-live` from `main` `eebb4c44` (17 Nov 2026); draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`.** This change does **not** change the live skill, the template skill copy or the nightly routine prompt. It adds a snapshot of the live skill and the proposed step as a marked draft (`docs/bot/live-skill/`). See "Implementation (repo part)" and "Follow-up (owner decisions)". |
+| Status | RFC merged as PR #10 (merge `ceabf99`, 15 Nov 2026 21:26 SAST, exact head `84590a20`). **Implementation, repo part only: merged as PR #13 (merge `e5fbfa58644f48f1ba01b718d3b9ced0d270dda2`, 17 Nov 2026 15:46 SAST, exact head `7a7cd868`, owner GO as reported to the author (PublicFunds); rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`; post-merge tag `snapshot-2026-11-17-1546` on `e5fbfa58`, pushed by the author on 17 Nov 2026; `check_live` OK at 15:55 SAST). Built on branch `chg-2026-061-nightly-check-live` from `main` `eebb4c44` (17 Nov 2026); draft PR #13 was opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`.** This change does **not** change the live skill, the template skill copy or the nightly routine prompt. It adds a snapshot of the live skill and the proposed step as a marked draft (`docs/bot/live-skill/`). See "Implementation (repo part)" and "Follow-up (owner decisions)". The routine and live skill step is CHG-2026-065. |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline / distribution). The repo part (wrapper script, tests, records, live-skill snapshot and draft) is on branch `chg-2026-061-nightly-check-live`. A merge needs two reviewer PASSes and the owner's GO naming the exact head. Changing the nightly routine and the live skill is a later step with its own owner GO. |
-| Environment | DEV: branch `chg-2026-061-nightly-check-live` (draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`), pre-change `main` `eebb4c44c82e47da2d8879e2af6b61287ed6cd68` (the RFC was written on `8b4f72b8`, tag `snapshot-2026-11-15-1817`); `main` `de37f666` merged in on 17 Nov 2026. This change publishes nothing. The routine prompt and the live skill on the bot computer are outside git and are not changed by this change. |
+| Environment | Merged to `main` as `e5fbfa58` (PR #13, 17 Nov 2026 15:46 SAST). Built in DEV: branch `chg-2026-061-nightly-check-live` (draft PR #13, opened 17 Nov 2026 11:43 SAST by the orchestrator at head `72d84812`), pre-change `main` `eebb4c44c82e47da2d8879e2af6b61287ed6cd68` (the RFC was written on `8b4f72b8`, tag `snapshot-2026-11-15-1817`); `main` `de37f666` merged in on 17 Nov 2026. This change publishes nothing. The routine prompt and the live skill on the bot computer are outside git and are not changed by this change. |
 | CIs affected (this RFC) | `itil/changes/CHG-2026-061-check-live-nightly.md`, `itil/registers/change-log.md` |
 | CIs affected (repo part, this branch) | New `scripts/nightly_check_live.py` and `tests/test_nightly_check_live.py` (CI-116); new `docs/bot/live-skill/` (live skill snapshot of 17 Nov 2026, the proposed step as a marked draft, README) and `tests/test_live_skill_snapshot.py`; this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md` |
 | CIs affected (later step, after the owner GO) | Live refresh skill; repo copy `docs/bot/skills/publicfunds-refresh/SKILL.md`; the nightly routine prompt; `itil/registers/csi-register.md` (CSI-036 status) |
@@ -170,8 +170,8 @@ Two points need a decision before that step:
 
 ### Rollback
 
-- Before a merge: close draft PR #13 unmerged and delete the branch.
-- After a merge: `git revert -m 1 <merge commit>`. Nothing else in the repo calls the wrapper. `scripts/check_live.py` stays. Git is the rollback; no `.bkp` files.
+- PR #13 was merged as `e5fbfa58` (17 Nov 2026 15:46 SAST). Before the merge, the rollback was to close the PR unmerged and delete the branch.
+- After the merge: `git revert -m 1 e5fbfa58` (or go back to the rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666` with a revert, never a reset). Nothing else in the repo calls the wrapper. `scripts/check_live.py` stays. Git is the rollback; no `.bkp` files.
 - Kill switch (CHG-2026-032 and RB-12): to turn the nightly step off, remove the added routine and skill text (write back the previous text). On a BREACH: report it as a breach, do not re-publish, follow RB-12.
 
 ### Testing (repo part)
@@ -259,7 +259,7 @@ The routine prompt change itself is done by the author after that GO. The exact 
 |---|---|---|---|
 | Independent reviewer 1 | | | |
 | Independent reviewer 2 | | | |
-| Change authority (owner GO naming the exact head) | | | |
+| Change authority (owner GO naming the exact head) | owner | GO for PR #13 at exact head `7a7cd868`, as reported to the author (PublicFunds) by the orchestrator; merged as `e5fbfa58` | 17 Nov 2026 |
 
 ## popia-review verdict: PASS
 
@@ -286,6 +286,7 @@ Repo part (17 Nov 2026, branch `chg-2026-061-nightly-check-live`; draft PR #13, 
 - `uv run pytest -q` (worktree, no warehouse), fix commit: **907 passed, 61 skipped, 0 failed** (first commit `e92d149d`: 892 passed, 61 skipped; baseline on `eebb4c44`: 865 passed, 61 skipped). This includes `tests/test_no_owner_quotes.py` and `tests/test_popia_names.py`, run again after the commit so that the new files are tracked.
 - No real publish, push or live check was run. `scripts/publish-public-data.sh` was not run.
 - Merge rule: two independent reviewer PASSes on the exact head and the owner's own GO naming that head. The routine and live skill change is a later step with its own owner GO (see "Follow-up (owner decisions)").
+- Merge: PR #13 was merged (merge `e5fbfa58644f48f1ba01b718d3b9ced0d270dda2`, 17 Nov 2026 15:46 SAST, exact head `7a7cd868`, owner GO as reported to the author (PublicFunds); rollback tag `snapshot-2026-11-17-pre-pf-pr13` on `de37f666`; post-merge tag `snapshot-2026-11-17-1546` on `e5fbfa58`, pushed by the author on 17 Nov 2026; `check_live` OK at 15:55 SAST). The author ran `scripts/check_live.py` again at 15:56 SAST: RESULT OK (build B20261117T012014Z). The reviewer PASSes on `7a7cd868` are not in the author's records **[unverified]**. Recorded by CHG-2026-065.
 
 ## Records carried in this branch
 
@@ -308,6 +309,8 @@ These items are outside this change. Each one needs the owner's own decision or 
 3. Decide if the routine always uses `--push` and never pushes by hand ("Push detection").
 4. After item 1: update CSI-036 for the nightly step and refresh the live-skill snapshot in the repo. D-08 stays open.
 
+On 17 Nov 2026 the owner decided items 2 and 3, and that the nightly publish runs only on the nightly run (as reported to the author (PublicFunds)). CHG-2026-065 holds the change for items 1 to 3.
+
 Notes for the owner GO on item 1:
 
 - (i) The nightly routine prompt already runs the publish. If only the skill step is applied, the night publishes twice. Change the routine prompt and the live skill together, so that the publish runs once (the draft step 4 says this).
@@ -326,4 +329,4 @@ A reviewer gave PASS_WITH_CONCERNS on `02fa60df` (as reported to the author (Pub
 ## Merge notes
 
 - PR #13 (this change) and PR #14 (CHG-2026-064) both change `STATUS.md`, `itil/registers/change-log.md` and the CHG-2026-063 record. A test merge with `git merge-tree` gives conflicts in those three files in either order.
-- Order: PR #13 merges first. Then PR #14 merges `main` into its branch (no rebase) and resolves the conflicts: `STATUS.md` keeps the PR #13 block and adds the CHG-2026-064 line; the CHG-2026-063 record and the change-log take the CHG-2026-064 wording.
+- Order: PR #13 merged first (`e5fbfa58`, 17 Nov 2026 15:46 SAST). The plan for PR #14 was to merge `main` into its branch (no rebase) and resolve the conflicts: `STATUS.md` keeps the PR #13 block and adds the CHG-2026-064 line; the CHG-2026-063 record and the change-log take the CHG-2026-064 wording.
