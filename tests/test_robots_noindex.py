@@ -1,8 +1,9 @@
-"""CHG-2026-063: hide the public site from search engines.
+"""CHG-2026-063: hide the public site from search engines. CHG-2026-064 variant B: robots.txt allows crawling, so crawlers
+can see the noindex meta tag (revert the CHG-2026-064 commit B to get variant A, `Disallow: /`).
 
 GitHub Pages serves this repo from branch `main`, folder `/`, with `.nojekyll` (CI-111). So `robots.txt` at the repo
 root is served at https://publicfunds.grokforum.site/robots.txt. These tests check that:
-- robots.txt is at the served root, is tracked by git, and has the exact content;
+- robots.txt is at the served root, is tracked by git, and has the exact content (variant B: empty `Disallow:`);
 - every served HTML document (each tracked .html file with a <head>) has the noindex meta tag;
 - the nightly publish code cannot remove robots.txt or change the HTML pages.
 """
@@ -13,7 +14,7 @@ from pathlib import Path
 from thusa import publish_data as pdx
 
 ROOT = Path(__file__).resolve().parent.parent
-ROBOTS = "User-agent: *\nDisallow: /\n"
+ROBOTS = "User-agent: *\nDisallow:\n"      # CHG-2026-064 variant B: empty Disallow (allow all)
 META = '<meta name="robots" content="noindex, nofollow">'
 SCRIPT = ROOT / "scripts" / "publish-public-data.sh"
 

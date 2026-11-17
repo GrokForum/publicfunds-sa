@@ -4,7 +4,7 @@
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
 | Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commit A (records, robots.txt unchanged; two commits from `de37f666`, the second is commit A) and commit B (robots.txt variant B, one commit after A). |
-| Decision | **The owner chooses A or B before a merge.** The merged `robots.txt` shows the choice: `Disallow: /` means A; an empty `Disallow:` means B. |
+| Decision | **The owner chooses A or B before a merge.** The branch head is commit B. Commit A is one commit back; to get A, revert commit B (`git revert <commit B>`). The merged `robots.txt` shows the choice: `Disallow: /` means A; an empty `Disallow:` means B. |
 | Type | Commit A: **Standard** (records only). Commit B: **Normal-high** (`itil/change-enablement.md`: hosting / distribution), because it changes what crawlers may fetch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
 | CIs affected | Commit A: none (records only: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`). Commit B: CI-117 (`robots.txt` and its register row), `tests/test_robots_noindex.py`, this record. |
@@ -66,7 +66,8 @@ The PR #13 branch also updates the same CHG-2026-063 lines (its commit `8385edb`
 
 ## Testing
 
-- Commit A and commit B results are in the commit report to the reviewer. `tests/test_robots_noindex.py` expects the robots.txt content of its own commit.
+- `tests/test_robots_noindex.py` expects the robots.txt content of its own commit: `Disallow: /` on commit A, an empty `Disallow:` on commit B. The meta tag and publish-safety tests are the same on both commits.
+- Full suite, guard tests and `dashboard_check` results for each commit are in the commit report to the reviewer.
 
 ## Approval
 
