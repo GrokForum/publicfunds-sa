@@ -22,6 +22,7 @@ Two kinds of run: the nightly routine does steps 0 to 6, and step 4 is its only 
 3. Report briefly: the coverage headline, flag counts by detector, and new flags or flags with "evidence changed" (`uv run pf review list --status stale`).
 4. **Nightly run only.** Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.
    On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**.
+   If step 4 was skipped, add no publish ACTION line; report the step 1 result.
    This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.
    `cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`
    Always use `--push`. Do not push by hand. Read data/publish-run.log for the evidence_guard line and the publish result.

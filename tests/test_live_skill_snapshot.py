@@ -105,6 +105,7 @@ INTRO = ("Two kinds of run: the nightly routine does steps 0 to 6, and step 4 is
 STEP4_FINAL_HEAD = (
     "4. **Nightly run only.** Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065). If step 1 returned anything else, do not publish.\n"
     "   On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**.\n"
+    "   If step 4 was skipped, add no publish ACTION line; report the step 1 result.\n"
     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n")
 WRAPPER_CMD = "`python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`"
 # Edit 4: the publish guard bullet. The first sentence no longer says "the routine publishes", and the ACTION line
@@ -392,3 +393,27 @@ def test_wording_without_publish_failed_fails():
     for bad in bads:
         assert bad != good
         assert not action_order_ok(bad)
+
+
+SKIP_RULE = "If step 4 was skipped, add no publish ACTION line; report the step 1 result."
+
+
+def skip_rule_ok(master: str, routine: str) -> bool:
+    """Step 4 skipped (step 1 did not return 0, or a run on request with no publish ask): no publish ACTION line."""
+    lines = master.splitlines()
+    s4 = next((i for i, l in enumerate(lines) if l.startswith("4. ")), None)
+    if s4 is None:
+        return False
+    cmd = next((i for i, l in enumerate(lines) if l.strip() == PUBLISH_CMD), None)
+    return (cmd is not None and any(l.strip() == SKIP_RULE for l in lines[s4:cmd])
+            and SKIP_RULE in routine_prompt(routine))
+
+
+def test_skipped_step_4_adds_no_publish_action_line():
+    assert skip_rule_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_skip_rule_removed_fails():
+    master, routine = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    assert not skip_rule_ok(master.replace("   " + SKIP_RULE + "\n", "", 1), routine)      # removed from the master
+    assert not skip_rule_ok(master, routine.replace(" " + SKIP_RULE, "", 1))               # removed from the routine prompt
