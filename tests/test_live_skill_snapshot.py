@@ -108,9 +108,10 @@ STEP4_FINAL_HEAD = (
     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n")
 WRAPPER_CMD = "`python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`"
 # Edit 4: the publish guard bullet. The first sentence no longer says "the routine publishes", and the ACTION line
-# order agrees with the exit 3 bullet: on a refusal, `ACTION: publish refused` first, then needs attention.
+# order agrees with the exit 3, exit 4 and other-exit bullets: refused (exit 3) or failed (exit 4, other non-zero)
+# first, then needs attention when the guard line is not a bare pass; exit 0 gives needs attention only, or nothing.
 GUARD_OLD = 'When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN), and begin the report with `ACTION: publish needs attention` and quote the line.'
-GUARD_NEW = 'The publish script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet: it adds no ACTION line of its own. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN) and quote the line. In this bullet, a refusal means publish exit 3 only. If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`; if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line. If there was no refusal and the guard line is not a bare pass, the report begins with `ACTION: publish needs attention`. A bare pass with no refusal adds no ACTION line.'
+GUARD_NEW = 'The publish script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet: it adds no ACTION line of its own. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN) and quote the line. The first ACTION line of the report depends on the publish exit code. If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`; if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line. If the publish failed (exit 4 or any other non-zero exit, see the bullets below), the report always begins with `ACTION: publish failed`; if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line. If the publish exited 0 and the guard line is not a bare pass, the report begins with `ACTION: publish needs attention`. A bare pass with publish exit 0 adds no ACTION line.'
 MASTER_EDITS = (
     (COMMENT, ""),                                                                                            # 1
     ("4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.\n"
@@ -125,8 +126,8 @@ MASTER_EDITS = (
     ("Do not retry and do not edit data. Report to the owner at once:",
      "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused`. If the guard line is not a bare pass (for example `BLOCKED`), put `ACTION: publish needs attention` on the next line (refused first, then needs attention). Then give first:"),  # 6
     ("   - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.\n",
-     "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Stop after the wrapper and report. Do not retry.\n"
-     "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
+     "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish failed`. If the guard line is not a bare pass, put `ACTION: publish needs attention` on the next line (failed first, then needs attention). Stop after the wrapper and report. Do not retry.\n"
+     "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Begin the report with `ACTION: publish failed`. If the guard line is not a bare pass, put `ACTION: publish needs attention` on the next line (failed first, then needs attention). Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
     ("   Then run: " + WRAPPER_CMD + "\n", "   The wrapper's exit code:\n"),                                 # 8
     ("   - 3: skipped, because it is clear that the publish did not push. Report the check_live: SKIPPED line.\n"
      "     The publish rules (exit 3, exit 4, evidence guard) still apply.\n",
@@ -217,7 +218,7 @@ def test_routine_file_names_the_publish_script_once():
 def test_routine_prompt_matches_the_master():
     prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
     assert "ACTION: publish refused" in prompt
-    assert "if both apply, `ACTION: publish refused` comes first, then `ACTION: publish needs attention`" in prompt
+    assert PROMPT_ACTION_RULE in prompt
     assert "publicfunds-refresh skill" in prompt and "steps 0 to 6" in prompt
     assert "This is the nightly run" in prompt and "the nightly-run path" in prompt
     assert "Step 4 of the skill is the only publish of the night" in prompt
@@ -238,22 +239,36 @@ def test_action_line_order_on_a_refused_publish():
     assert action_order_ok(t)
 
 
-BARE_PASS_RULE = ("If there was no refusal and the guard line is not a bare pass, the report begins with "
-                  "`ACTION: publish needs attention`. A bare pass with no refusal adds no ACTION line.")
+BARE_PASS_RULE = ("If the publish exited 0 and the guard line is not a bare pass, the report begins with "
+                  "`ACTION: publish needs attention`. A bare pass with publish exit 0 adds no ACTION line.")
+REFUSED_RULE = ("If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`; "
+                "if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line.")
+FAILED_RULE = ("If the publish failed (exit 4 or any other non-zero exit, see the bullets below), the report always begins with "
+               "`ACTION: publish failed`; if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line.")
+FAILED_BULLET = ("Begin the report with `ACTION: publish failed`. If the guard line is not a bare pass, put "
+                 "`ACTION: publish needs attention` on the next line (failed first, then needs attention).")
+PROMPT_ACTION_RULE = ("on publish exit 3, `ACTION: publish refused`; on publish exit 4 or any other non-zero exit, "
+                      "`ACTION: publish failed`; then, if the guard line is not a bare pass, `ACTION: publish needs attention` "
+                      "on the next line. On publish exit 0, the report begins with `ACTION: publish needs attention` only when "
+                      "the guard line is not a bare pass. A bare pass with publish exit 0 adds no ACTION line")
 
 
 def action_order_ok(text: str) -> bool:
-    """The guard bullet and the exit 3 bullet agree: on a refusal the report begins with `ACTION: publish refused`."""
+    """The guard bullet and the exit 3, exit 4 and other-exit bullets agree on the first ACTION line and the order."""
     lines = text.splitlines()
     guard = next((l for l in lines if "**Publish guard line" in l), "")
     exit3 = next((l for l in lines if "If the publish script exits **3**" in l), "")
-    return ("In this bullet, a refusal means publish exit 3 only." in guard
-            and "If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`; "
-            "if the guard line is not a bare pass, `ACTION: publish needs attention` goes on the next line." in guard
-            and BARE_PASS_RULE in guard
+    exit4 = next((l for l in lines if "If it exits **4**" in l), "")
+    other = next((l for l in lines if "Any other non-zero publish exit" in l), "")
+    def before(line, a, b):
+        return a in line and b in line and line.index(a) < line.index(b)
+    return (REFUSED_RULE in guard and FAILED_RULE in guard and BARE_PASS_RULE in guard
             and "begin the report with `ACTION: publish needs attention`" not in guard
-            and "If there was no refusal, the report begins" not in guard
-            and exit3.index("`ACTION: publish refused`") < exit3.index("`ACTION: publish needs attention`"))
+            and "If there was no refusal" not in guard and "with no refusal" not in guard
+            and before(exit3, "`ACTION: publish refused`", "`ACTION: publish needs attention`")
+            and FAILED_BULLET in exit4 and FAILED_BULLET in other
+            and before(exit4, "`ACTION: publish failed`", "`ACTION: publish needs attention`")
+            and before(other, "`ACTION: publish failed`", "`ACTION: publish needs attention`"))
 
 
 def test_action_order_check_catches_a_conflicting_guard_bullet():
@@ -323,23 +338,57 @@ def test_wrapper_runs_after_every_publish_and_matches_its_exit_codes():
     assert ncl.publish_pushed(5, "")[0] == ncl.UNKNOWN
 
 
-def test_bare_pass_with_no_refusal_adds_no_action_line():
+def test_bare_pass_with_publish_exit_0_adds_no_action_line():
     t = MASTER.read_text(encoding="utf-8")
     guard = next(l for l in t.splitlines() if "**Publish guard line" in l)
     assert BARE_PASS_RULE in guard
     assert "Only a bare `evidence_guard: pass` is quiet: it adds no ACTION line of its own." in guard
     prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
-    assert "A bare pass with no refusal adds no ACTION line" in prompt
+    assert "A bare pass with publish exit 0 adds no ACTION line" in prompt
 
 
 def test_wording_that_gives_a_bare_pass_an_action_line_fails():
     good = MASTER.read_text(encoding="utf-8")
     for bad in (
         good.replace(BARE_PASS_RULE, "If there was no refusal, the report begins with `ACTION: publish needs attention`.", 1),
-        good.replace("If there was no refusal and the guard line is not a bare pass, the report begins",
-                     "If there was no refusal, the report begins", 1),
-        good.replace("A bare pass with no refusal adds no ACTION line.",
-                     "A bare pass with no refusal begins the report with `ACTION: publish needs attention`.", 1),
+        good.replace("If the publish exited 0 and the guard line is not a bare pass, the report begins",
+                     "If the publish exited 0, the report begins", 1),
+        good.replace("A bare pass with publish exit 0 adds no ACTION line.",
+                     "A bare pass with publish exit 0 begins the report with `ACTION: publish needs attention`.", 1),
     ):
+        assert bad != good
+        assert not action_order_ok(bad)
+
+
+def test_publish_failed_comes_first_on_exit_4_and_other_non_zero_exits():
+    t = MASTER.read_text(encoding="utf-8")
+    assert action_order_ok(t)
+    lines = t.splitlines()
+    for marker in ("If it exits **4**", "Any other non-zero publish exit"):
+        line = next(l for l in lines if marker in l)
+        assert line.index("`ACTION: publish failed`") < line.index("`ACTION: publish needs attention`")
+    prompt = routine_prompt(ROUTINE.read_text(encoding="utf-8"))
+    assert PROMPT_ACTION_RULE in prompt
+    assert prompt.index("`ACTION: publish failed`") < prompt.index("then, if the guard line is not a bare pass")
+
+
+def test_wording_without_publish_failed_fails():
+    good = MASTER.read_text(encoding="utf-8")
+    bads = (
+        # the old exit 4 wording: no ACTION line on exit 4 with a bare pass
+        good.replace("exits 3. " + FAILED_BULLET + " Stop after the wrapper", "exits 3. Stop after the wrapper", 1),
+        # the old other-exit wording
+        good.replace("exits 2. " + FAILED_BULLET + " Stop and report", "exits 2. Stop and report", 1),
+        # order swapped on exit 4: needs attention before failed
+        good.replace("exits 3. " + FAILED_BULLET,
+                     "exits 3. Begin the report with `ACTION: publish needs attention`. If the guard line is not a bare pass, put "
+                     "`ACTION: publish failed` on the next line (needs attention first, then failed).", 1),
+        # the failed sentence dropped from the guard bullet (exit 4 with a bare pass then gets no ACTION line)
+        good.replace(FAILED_RULE + " ", "", 1),
+        # the guard bullet says needs attention begins the report with no refusal (that would cover exit 4)
+        good.replace(BARE_PASS_RULE, "If there was no refusal and the guard line is not a bare pass, the report begins with "
+                     "`ACTION: publish needs attention`. A bare pass with no refusal adds no ACTION line.", 1),
+    )
+    for bad in bads:
         assert bad != good
         assert not action_order_ok(bad)
