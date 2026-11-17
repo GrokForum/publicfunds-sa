@@ -107,6 +107,10 @@ STEP4_FINAL_HEAD = (
     "   On a run on request, skip this step: do not publish unless the owner asks for a publish. If the owner asks, run this step with the same condition: only if step 1 returned **0**.\n"
     "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n")
 WRAPPER_CMD = "`python3 scripts/nightly_check_live.py --publish-exit <that exit code> --publish-log data/publish-run.log; echo $?`"
+# Edit 4: the publish guard bullet. The first sentence no longer says "the routine publishes", and the ACTION line
+# order agrees with the exit 3 bullet: on a refusal, `ACTION: publish refused` first, then needs attention.
+GUARD_OLD = 'When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN), and begin the report with `ACTION: publish needs attention` and quote the line.'
+GUARD_NEW = 'The publish script prints one line starting `evidence_guard:`. Add a line "Evidence guard:" to the report with that line and up to three note lines under it. Only a bare `evidence_guard: pass` is quiet. If the line is anything else (`pass (N notes)`, `warn (N notes)`, `BLOCKED`, `not an evidence-guard refusal`, `UNKNOWN`) or is **missing**, treat it as not passed (a missing line is UNKNOWN) and quote the line. If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`, and `ACTION: publish needs attention` goes on the next line. If there was no refusal, the report begins with `ACTION: publish needs attention`.'
 MASTER_EDITS = (
     (COMMENT, ""),                                                                                            # 1
     ("4. **[DRAFT, CHG-2026-061: proposed new step; not in the live skill]** Only if step 1 returned **0**: publish, then check the live site.\n"
@@ -116,11 +120,10 @@ MASTER_EDITS = (
      "   Always use `--push`. Do not push by hand. Read data/publish-run.log for the evidence_guard line and the publish result.\n"
      "   Then, whatever the publish exit code, run the live check wrapper. It only reads; it never publishes or pushes:\n"
      "   " + WRAPPER_CMD + "\n"),                                                                                # 3
-    ("When the routine publishes with `scripts/publish-public-data.sh --push`, the script prints one line starting `evidence_guard:`.",
-     "The publish script prints one line starting `evidence_guard:`."),                                     # 4
+    (GUARD_OLD, GUARD_NEW),                                                                                    # 4
     ("# PublicFunds refresh\n\n", "# PublicFunds refresh\n\n" + INTRO),                                       # 5
     ("Do not retry and do not edit data. Report to the owner at once:",
-     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused`. If the guard line is `BLOCKED`, put `ACTION: publish needs attention` on the next line (refused first, then needs attention). Then give first:"),  # 6
+     "Do not retry and do not edit data. The wrapper prints `check_live: SKIPPED` and exits 3. Begin the report with `ACTION: publish refused`. If the guard line is not a bare pass (for example `BLOCKED`), put `ACTION: publish needs attention` on the next line (refused first, then needs attention). Then give first:"),  # 6
     ("   - If it exits **4**, stop and report (other changes, wrong branch, main moved). Any other non-zero exit: stop and report too.\n",
      "   - If it exits **4** (other changes, wrong branch, main moved), nothing was pushed. The wrapper prints `check_live: SKIPPED` and exits 3. Stop after the wrapper and report. Do not retry.\n"
      "   - Any other non-zero publish exit: the wrapper cannot tell if the publish pushed. It prints `check_live: FAILED CHECK` and exits 2. Stop and report, and check by hand if new data went live. Do not retry.\n"),  # 7
@@ -232,6 +235,38 @@ def test_action_line_order_on_a_refused_publish():
     line = next(l for l in t.splitlines() if "If the publish script exits **3**" in l)
     assert line.index("`ACTION: publish refused`") < line.index("`ACTION: publish needs attention`")
     assert "(refused first, then needs attention)" in line
+    assert action_order_ok(t)
+
+
+def action_order_ok(text: str) -> bool:
+    """The guard bullet and the exit 3 bullet agree: on a refusal the report begins with `ACTION: publish refused`."""
+    lines = text.splitlines()
+    guard = next((l for l in lines if "**Publish guard line" in l), "")
+    exit3 = next((l for l in lines if "If the publish script exits **3**" in l), "")
+    return ("If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`, "
+            "and `ACTION: publish needs attention` goes on the next line." in guard
+            and "If there was no refusal, the report begins with `ACTION: publish needs attention`." in guard
+            and "begin the report with `ACTION: publish needs attention`" not in guard
+            and exit3.index("`ACTION: publish refused`") < exit3.index("`ACTION: publish needs attention`"))
+
+
+def test_action_order_check_catches_a_conflicting_guard_bullet():
+    good = MASTER.read_text(encoding="utf-8")
+    assert action_order_ok(good)
+    bads = (
+        # the old draft wording: needs-attention begins the report, also on a refusal
+        good.replace("treat it as not passed (a missing line is UNKNOWN) and quote the line. If the publish was refused",
+                     "treat it as not passed (a missing line is UNKNOWN), and begin the report with `ACTION: publish needs attention` and quote the line. If the publish was refused", 1),
+        # the refusal sentence dropped from the guard bullet
+        good.replace("If the publish was refused (exit 3, see the next bullet), the report always begins with `ACTION: publish refused`, "
+                     "and `ACTION: publish needs attention` goes on the next line. ", "", 1),
+        # the exit 3 bullet order swapped
+        good.replace("Begin the report with `ACTION: publish refused`. If the guard line is not a bare pass (for example `BLOCKED`), put `ACTION: publish needs attention` on the next line",
+                     "Begin the report with `ACTION: publish needs attention`. If the guard line is not a bare pass (for example `BLOCKED`), put `ACTION: publish refused` on the next line", 1),
+    )
+    for bad in bads:
+        assert bad != good
+        assert not action_order_ok(bad)
 
 
 def test_live_skill_has_not_drifted():

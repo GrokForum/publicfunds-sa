@@ -15,7 +15,7 @@ At the end, send one report with SendToUser. Put in it:
 - the step 0 result, and the step 1 exit code;
 - each source's status from step 2, with the known error or the draft incident for each source that is not ok;
 - the coverage headline, flag counts by detector, and new or "evidence changed" flags (step 3);
-- the publish exit code (or that step 4 did not publish because step 1 did not return 0) and the "Evidence guard:" line (step 4); begin the report with `ACTION: publish refused` or `ACTION: publish needs attention` when the skill says so; if both apply, `ACTION: publish refused` comes first, then `ACTION: publish needs attention`;
+- the publish exit code (or that step 4 did not publish because step 1 did not return 0) and the "Evidence guard:" line (step 4); begin the report with `ACTION: publish refused` or `ACTION: publish needs attention` when the skill says so; if both apply, `ACTION: publish refused` comes first, then `ACTION: publish needs attention`. On a refused publish (exit 3) the report always begins with `ACTION: publish refused`; it begins with `ACTION: publish needs attention` only when there was no refusal;
 - the RESULT:, check_live:, healthz: and NEXT: lines from `scripts/nightly_check_live.py`, and any [BREACH] or [WARN] lines;
 - the review-app health check result (step 5).
 A BREACH, a failed check, a refused publish or a skipped publish is reported as that, never as success.
