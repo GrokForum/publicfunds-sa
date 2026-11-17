@@ -2,7 +2,7 @@
 
 ## Current (17 Nov 2026)
 
-- 17 Nov 2026, DEV: CHG-2026-063 (hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag) is built on local branch `chg-2026-063-robots-noindex` from `7cb9faf`. Not pushed. It needs two reviewer PASSes and an owner GO that names the exact head. Rollback: delete the branch, or after a merge `git revert -m 1 <merge commit>`.
+- Merged and live: CHG-2026-063 (PR #12, hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag): merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129` (pre-change tag `snapshot-2026-11-17-pre-chg063`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Live `robots.txt` HTTP 200 with the exact content and `check_live` OK at 11:30 SAST. Rollback: `git revert -m 1 de37f666`.
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
 - Live data build: B20261117T012014Z, generated 17 Nov 2026 03:20 SAST, `code_commit` `eebb4c4` (the 17 Nov 2026 nightly, data commit `7cb9faf`; data quality 58 pass, 1 warn, 0 fail). The nightly report said that the publish script committed but did not push, and that a push by hand was needed (as reported to the author; see CHG-2026-061, "Push detection").
 - PROD: the nightly 03:00 SAST data refresh and publish is a standing pre-approved change (see `changes/CAB-DECISION.md`). Owner GO by role and date; exact words are in the private approval record.
