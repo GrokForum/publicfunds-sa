@@ -1,20 +1,20 @@
-# CHG-2026-064: Follow-up to the review of CHG-2026-063 (records; robots.txt variant A or B)
+# CHG-2026-064: Follow-up to the review of CHG-2026-063 (records; robots.txt variant A chosen)
 
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
-| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commit A (records, robots.txt unchanged; two commits from `de37f666`, the second is commit A) and commit B (robots.txt variant B, one commit after A). |
-| Decision | **The owner chooses A or B before a merge.** The merged `robots.txt` shows the choice: `Disallow: /` means A; an empty `Disallow:` means B. |
-| Type | Commit A: **Standard** (records only). Commit B: **Normal-high** (`itil/change-enablement.md`: hosting / distribution), because it changes what crawlers may fetch. |
+| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commits: `e532110` and `1742336b` (commit A: records, robots.txt unchanged), `ea449394` (commit B: robots.txt variant B), `b3cb0ea8` (revert of commit B), then this record update. The branch result is variant A. |
+| Decision | **Variant A** (keep `Disallow: /`), chosen by the owner on 17 Nov 2026, as reported to the author (PublicFunds). Variant B was made as commit `ea449394` and reverted by commit `b3cb0ea8` (`git revert ea449394`). |
+| Type | **Standard** (records only). The net change from `de37f666` does not change `robots.txt`, the HTML pages, the tests or the CI register. Variant B (Normal-high: hosting / distribution) was reverted on the branch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
-| CIs affected | Commit A: none (records only: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`). Commit B: CI-117 (`robots.txt` and its register row), `tests/test_robots_noindex.py`, this record. |
+| CIs affected | None (records only: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`). Commit B touched CI-117 (`robots.txt` and its register row) and `tests/test_robots_noindex.py`; the revert put them back as on `main`. |
 | Linked records | CHG-2026-063 (PR #12, merge `de37f666`), CI-117, CI-111, CHG-2026-061 (PR #13 also edits the CHG-2026-063 record lines; see "Merge notes") |
-| Rollback | Before a merge: delete the branch. To get A from B: `git revert <commit B>`. After a merge: `git revert -m 1 <merge commit>`. Git is the rollback; no `.bkp` files. |
+| Rollback | Before a merge: delete the branch. After a merge: `git revert -m 1 <merge commit>`. To try variant B later: a new change record that reapplies commit `ea449394`. Git is the rollback; no `.bkp` files. |
 
 ## Goal
 
 1. Correct the CHG-2026-063 records on `main`. They still describe a DEV branch that is not merged. After this change they state, as past-tense facts, the merge of PR #12 and the live check.
-2. Give the owner two robots.txt variants to choose from, after the reviewer concern about how robots.txt and the noindex meta tag work together.
+2. Give the owner two robots.txt variants to choose from, after the reviewer concern about how robots.txt and the noindex meta tag work together. The owner chose variant A.
 
 ## Commit A: records (robots.txt unchanged)
 
@@ -29,12 +29,12 @@
 
 `Disallow: /` (variant A) stops a crawler from fetching any page, so the crawler never sees the `noindex` meta tag. A URL that a search engine already knows, or finds on another site, can stay in results as a bare link without a snippet. The meta tag can only remove a page from an index if the crawler can fetch the page.
 
-## Variant A: `Disallow: /` (commit A, as live today)
+## Variant A: `Disallow: /` (commit A; chosen)
 
 - Crawlers that obey robots.txt fetch nothing: HTML, JSON, markdown, PDF and DOCX files alike.
 - Limit: URLs that are already known can stay in results as bare links for a long time. The meta tag cannot help with them.
 
-## Variant B: empty `Disallow:` plus the noindex meta tag (commit B, branch head)
+## Variant B: empty `Disallow:` plus the noindex meta tag (commit `ea449394`; reverted by `b3cb0ea8`)
 
 - `robots.txt` is exactly `User-agent: *` and an empty `Disallow:` line (LF line ends). This allows crawling.
 - Each served HTML document keeps `<meta name="robots" content="noindex, nofollow">`. Crawlers can now fetch the pages, see the tag, and drop or never add those pages.
@@ -45,7 +45,7 @@
   - the raw review templates in `thusa/review/templates/`. Only `base.html` has the meta tag; the other templates have no `<head>`.
 - Under A these files are blocked from crawling, but URLs that are already known can stay in results.
 
-## Options for the owner (not done in this change)
+## Options for the owner (not part of this change)
 
 - Search engine removal tools with the owner's own accounts, for example Google Search Console "Removals" and Bing Webmaster Tools "Block URLs". These work with A or B.
 - A staged path: use B for some weeks so that crawlers see the noindex tag, then go back to A.
@@ -66,13 +66,16 @@ The PR #13 branch also updates the same CHG-2026-063 lines (its commit `8385edb`
 
 ## Testing
 
-- Commit A and commit B results are in the commit report to the reviewer. `tests/test_robots_noindex.py` expects the robots.txt content of its own commit.
+- `tests/test_robots_noindex.py` expects the robots.txt content of its own commit: `Disallow: /` on commit A and on the result after the revert, an empty `Disallow:` on commit B.
+- Commit A (`1742336b`): `uv run pytest -q` 871 passed, 61 skipped; robots and guard tests 12 passed.
+- Commit B (`ea449394`): `uv run pytest -q` 871 passed, 61 skipped; robots and guard tests 12 passed; `dashboard_check` exit 0, 0 problems.
+- After the revert and this record update: same tests as commit A (results in the commit report to the reviewer).
 
 ## Approval
 
 | Role | Name | Commit approved | Date |
 |---|---|---|---|
-| Change authority | owner | owner chooses A or B; GO must name the exact head | |
+| Change authority | owner | variant A chosen, as reported to the author (PublicFunds) | 17 Nov 2026 |
 | Reviewer 1 | reviewer | | |
 | Reviewer 2 | reviewer | | |
 
