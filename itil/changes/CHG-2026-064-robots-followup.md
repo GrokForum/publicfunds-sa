@@ -3,11 +3,11 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | Follow-up to a reviewer PASS_WITH_CONCERNS on PR #12 (CHG-2026-063), 17 Nov 2026, as reported to the author (PublicFunds). This record is not a merge GO. |
-| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Two commits: commit A (records, robots.txt unchanged) and commit B (robots.txt variant B). |
+| Status | Built in DEV on branch `chg-2026-064-robots-followup` from `main` `de37f666` (tag `snapshot-2026-11-17-1129`). Commit A (records, robots.txt unchanged; two commits from `de37f666`, the second is commit A) and commit B (robots.txt variant B, one commit after A). |
 | Decision | **The owner chooses A or B before a merge.** The merged `robots.txt` shows the choice: `Disallow: /` means A; an empty `Disallow:` means B. |
 | Type | Commit A: **Standard** (records only). Commit B: **Normal-high** (`itil/change-enablement.md`: hosting / distribution), because it changes what crawlers may fetch. |
 | Environment | DEV (local worktree). Pre-change `main` is `de37f666c12d1d6b7a815860894af0372514ba7f`. After a merge, GitHub Pages serves the result from `main`, folder `/`. |
-| CIs affected | Commit A: none (records only). Commit B: CI-117 (`robots.txt`), `tests/test_robots_noindex.py`. Records in both: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`; CI-117 status row. |
+| CIs affected | Commit A: none (records only: this record, the CHG-2026-063 record, `itil/registers/change-log.md`, `STATUS.md`). Commit B: CI-117 (`robots.txt` and its register row), `tests/test_robots_noindex.py`, this record. |
 | Linked records | CHG-2026-063 (PR #12, merge `de37f666`), CI-117, CI-111, CHG-2026-061 (PR #13 also edits the CHG-2026-063 record lines; see "Merge notes") |
 | Rollback | Before a merge: delete the branch. To get A from B: `git revert <commit B>`. After a merge: `git revert -m 1 <merge commit>`. Git is the rollback; no `.bkp` files. |
 
@@ -18,7 +18,7 @@
 
 ## Commit A: records (robots.txt unchanged)
 
-- `STATUS.md`, the CHG-2026-063 record (Status, Environment, Approval, Post-implementation review), its change-log row and CI-117 now state:
+- `STATUS.md`, the CHG-2026-063 record (Status, Environment, Approval, Post-implementation review) and its change-log row now state:
   - merged in PR #12, exact head `3c93c88d`, merge commit `de37f666`, 17 Nov 2026 11:29 SAST, tag `snapshot-2026-11-17-1129`;
   - live check, 17 Nov 2026 11:30 SAST: `robots.txt` HTTP 200 with the exact content, the noindex meta tag present on `/` and `/apps/public-dashboard/`, `check_live` OK;
   - merged by the orchestrator on an owner instruction as reported to the author (PublicFunds);
@@ -55,7 +55,7 @@
 
 The PR #13 branch also updates the same CHG-2026-063 lines (its commit `8385edb`). This change uses the same text where the facts allow:
 
-- the same text: the `STATUS.md` CHG-2026-063 line, the CHG-2026-063 Environment and Change authority rows and Outcome line;
+- the same text: the `STATUS.md` CHG-2026-063 line, the CHG-2026-063 Environment and Change authority rows and Outcome line. The CHG-2026-064 `STATUS.md` line is placed away from the lines that PR #13 changes. Commit A does not change the CI register, so PR #13's CI-116 and CI-117 rows merge without a conflict;
 - different text, because the reviews outside GitHub are now recorded and "Recorded by CHG-2026-061" is only true if PR #13 merges: the CHG-2026-063 Status row, the Reviewer 1 and 2 rows, the Process note and the change-log row. Whichever PR merges second takes the CHG-2026-064 text for these lines.
 
 ## Stays the same
