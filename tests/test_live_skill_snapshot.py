@@ -13,6 +13,8 @@ CHG-2026-065: the master copy of the live skill (publicfunds-refresh.MASTER.md) 
 routine prompt (routine-nightly.PROPOSED.md) goes with it. The dated snapshot stays byte-exact to its own sha256.
 """
 import hashlib
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -144,16 +146,30 @@ WAIT_CMD = "`pgrep -f '[t]husa run' > /dev/null && echo running || echo none`"
 CANDIDATE_CMD = ("`cd /workspace/publicfunds && rm -rf data/popia-candidate && mkdir -p data/popia-candidate "
                  "&& cp -a public-data/v1 data/popia-candidate/v1 && uv run pf publish-data --out data/popia-candidate/v1 "
                  "> data/popia-candidate.json 2> data/popia-candidate.log; echo $?`")
-INCIDENT = "Record an incident with **publicfunds-itil** and commit it locally (no push)."
+INCIDENT = "Record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local` (never pushed; see \"Incidents\")."
+NIGHTLY_SKIPPED = "ACTION: nightly skipped (another run still in progress after 2h)"
+NOT_ON_MAIN = "ACTION: publish blocked (not on main)"
+INCIDENT_WT_CMD = ("`cd /workspace/publicfunds && git worktree prune && { [ -d /workspace/publicfunds-incidents ] "
+                   "|| git worktree add -q /workspace/publicfunds-incidents incidents/local 2>/dev/null "
+                   "|| git worktree add -q -b incidents/local /workspace/publicfunds-incidents main; }; echo $?`")
+INCIDENT_COMMIT_CMD = ("`cd /workspace/publicfunds-incidents && [ \"$(git rev-parse --abbrev-ref HEAD)\" = incidents/local ] "
+                       "&& git add -- itil/ && git commit -q -m \"<incident id>: <short title>\"; echo $?`")
+INCIDENTS_BLOCK = (
+    "**Incidents** (CHG-2026-066). An incident record is committed only on the local branch `incidents/local`, in its own worktree `/workspace/publicfunds-incidents`, never on `main`. The branch `incidents/local` is never pushed. The main checkout `/workspace/publicfunds` stays on `main` for the whole run and never switches branches, so every pull and the publish run on `main`. Run exactly:\n"
+    "   a. " + INCIDENT_WT_CMD + "\n"
+    "   b. Write the incident record (**publicfunds-itil**) under `/workspace/publicfunds-incidents/itil/`, not under `/workspace/publicfunds/itil/`.\n"
+    "   c. " + INCIDENT_COMMIT_CMD + "\n"
+    "   d. Never run `git push` in `/workspace/publicfunds-incidents`. If a command above exits non-zero, do not force, stash, reset or delete anything; put the incident text in the report instead.\n\n")
 STEP0_NEW = (
     "0. Before any git pull or push (CHG-2026-066), in this order:\n"
-    "   - **Wait for any other pipeline run.** Run " + WAIT_CMD + ". If it prints `running`, another `thusa run` is in progress on this computer: wait for it to end (check again every 60 s) and do not start a second run.\n"
+    "   - **Wait for any other pipeline run.** Run " + WAIT_CMD + ". If it prints `running`, another `thusa run` is in progress on this computer: do not start a second run. Check again every 60 s, for up to 120 minutes. If it still prints `running` after 120 minutes, begin the report with exactly `" + NIGHTLY_SKIPPED + "`, record an incident (see \"Incidents\"), and do nothing else: no pull, no publish, no push; skip steps 1 to 6.\n"
     "   - **Account and origin guard.** Run exactly: " + GUARD_CMD + "\n"
     "     Every git pull and push in this run goes out as the GrokForum GitHub account, never as any other GitHub account (the computer's active `gh` account can change). Keep `GH_TOKEN` exported for the whole run. If a later command runs in a new shell, run this guard again before any git pull or push. A non-zero exit means **stop and report**: begin the report with `ACTION: account or origin check failed`, skip steps 1 to 6, and do not pull, publish or push.\n"
     "   Then update the checkout (CHG-2026-025). Run exactly: ")
 STEP4_SCOPE_AND_CHECKS = (
     "   The push of `public-data/` to `main` of GrokForum/publicfunds-sa by this step is the standing pre-approved change (owner approval of 23 Oct 2026, recorded in `changes/CAB-DECISION.md`; the repo moved to GrokForum on 1 Nov 2026). It covers this data refresh only and updates the live dashboard. Never push anything else and never merge PRs.\n"
     "   Before the publish command, in this order (CHG-2026-066):\n"
+    "   - **On main.** Run `git -C /workspace/publicfunds rev-parse --abbrev-ref HEAD`. If it does not print `main`, do not publish and do not switch branches; begin the report with `" + NOT_ON_MAIN + "`; skip the rest of this step. The publish script commits on the current branch before it checks the branch, so a publish off `main` would leave a data commit on the wrong branch.\n"
     "   - **Account and origin guard again.** Run the step 0 guard command. A non-zero exit: do not publish; begin the report with `ACTION: account or origin check failed`; skip the rest of this step.\n"
     "   - **POPIA release check.** Make the candidate public data without touching `public-data/`: " + CANDIDATE_CMD + "\n"
     "     If that exits 0, run `git diff --no-index --stat public-data/v1 data/popia-candidate/v1` and read every changed line. Use the **popia-review** skill's release check (copy at `/home/box/shared-laws/popia-review-SKILL.md` if the skill cannot be loaded): no ID, phone or account numbers, no emails, no addresses and no names of private persons.\n"
@@ -161,7 +177,7 @@ STEP4_SCOPE_AND_CHECKS = (
     "     - BLOCK: do not publish. Begin the report with `ACTION: publish blocked (POPIA)`. Say what kind of item was found and in which file, never the personal data itself. Skip the rest of this step.\n"
     "     - The candidate export exits 3 (export refused, nothing written): skip the release check and go on to the publish command. It refuses in the same way, and the publish rules below report it.\n"
     "     - The candidate export exits with any other non-zero code: the check cannot run, so treat it as BLOCK (`ACTION: publish blocked (POPIA)`, reason: release check could not run; quote the last 5 lines of `data/popia-candidate.log`).\n"
-    "     For a blocked publish, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` is the only publish ACTION line; the publish exit code rules below do not apply, because the publish did not run.\n")
+    "     For a blocked publish, `" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` is the only publish ACTION line; the publish exit code rules below do not apply, because the publish did not run.\n")
 BACKUP_BLOCK = (
     "   **Back up state** (CHG-2026-044 appendix A, CHG-2026-066). Do this only if step 1 returned 0 and the publish exited 0. Do it after the live check, also when the wrapper said stop (the backup does not publish).\n"
     "   `cd /workspace/publicfunds && scripts/backup-state.sh > data/backup-run.log 2>&1; echo $?`\n"
@@ -170,12 +186,12 @@ BACKUP_BLOCK = (
     "   - Backups stay on this computer only. Never commit, push or publish them.\n")
 CHG066_EDITS = (
     ("(see step 4).\n\n",
-     "(see step 4). On the nightly run, the routine prompt decides whether the report is sent (it sends nothing when all is well).\n\n"),  # A
+     "(see step 4). On the nightly run, the routine prompt decides whether the report is sent (it sends nothing when all is well).\n\n" + INCIDENTS_BLOCK),  # A
     ("0. Update the checkout first (CHG-2026-025). Run exactly: ", STEP0_NEW),                                          # B
     ("   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01.\n",
      "   - **2** means a data-quality check failed. Don't publish anything; summarise the failed checks and follow runbook RB-01. " + INCIDENT + "\n"),  # C
     ("   - otherwise draft an incident with **publicfunds-itil**.\n",
-     "   - otherwise (a source fails in a new way) record an incident with **publicfunds-itil** and commit it locally (no push).\n"),  # D
+     "   - otherwise (a source fails in a new way) record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local` (never pushed; see \"Incidents\").\n"),  # D
     ("   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n",
      "   This is the only publish of the night. The nightly routine prompt runs this skill and does not publish by itself.\n" + STEP4_SCOPE_AND_CHECKS),  # E
     ("(failed first, then needs attention). Stop after the wrapper and report. Do not retry.\n",
@@ -500,7 +516,14 @@ DUTIES = (
     ("never push anything else, never merge PRs", "M", "Never push anything else and never merge PRs."),
     ("never merge PRs, in the routine", "R", "never merge PRs"),
     ("never confirm or reject flags", "M", "Never confirm or reject flags"),
-    ("incident on a failed gate, committed locally", "M", "follow runbook RB-01. Record an incident with **publicfunds-itil** and commit it locally (no push)."),
+    ("incident on a failed gate, on the local incidents branch", "M", "follow runbook RB-01. Record an incident with **publicfunds-itil** and commit it on the local incidents branch `incidents/local`"),
+    ("incidents only on incidents/local, never on main, never pushed", "M", "never on `main`. The branch `incidents/local` is never pushed."),
+    ("main checkout stays on main before any pull or publish", "M", "stays on `main` for the whole run and never switches branches"),
+    ("main check before the publish", "M", "**On main.**"),
+    ("wait cap of 2 hours", "M", "Check again every 60 s, for up to 120 minutes."),
+    ("nightly skipped after 2 hours: ACTION line", "M", "`ACTION: nightly skipped (another run still in progress after 2h)`"),
+    ("nightly skipped: no pull, no publish, no push", "M", "do nothing else: no pull, no publish, no push"),
+    ("nightly skipped in the quiet rule", "R", "a nightly skipped because another run was still in progress after 2 hours"),
     ("incident on a new source failure", "M", "(a source fails in a new way) record an incident"),
     ("incident on a failed push", "M", "(failed first, then needs attention). Record an incident"),
     ("review-app health check and restart", "M", "scripts/review-app.sh restart"),
@@ -540,10 +563,11 @@ def order_ok(master: str) -> bool:
     """Account guard before the first pull; guard again and POPIA check before the push; backup after the live check."""
     i = master.find
     guard0, fetch = i("**Account and origin guard.**"), i("git fetch -q origin")
-    guard4, popia, cmd = i("**Account and origin guard again.**"), i("**POPIA release check.**"), i(PUBLISH_CMD)
+    on_main, guard4 = i("**On main.**"), i("**Account and origin guard again.**")
+    popia, cmd = i("**POPIA release check.**"), i(PUBLISH_CMD)
     wrapper, backup = i(WRAPPER_CMD), i("**Back up state**")
-    return (master.count(PUBLISH_CMD) == 1 and min(guard0, fetch, guard4, popia, cmd, wrapper, backup) >= 0
-            and guard0 < fetch < guard4 < popia < cmd < wrapper < backup)
+    return (master.count(PUBLISH_CMD) == 1 and min(guard0, fetch, on_main, guard4, popia, cmd, wrapper, backup) >= 0
+            and guard0 < fetch < on_main < guard4 < popia < cmd < wrapper < backup)
 
 
 def test_order_of_guard_check_publish_and_backup():
@@ -557,6 +581,7 @@ def test_order_check_catches_bad_text():
         good.replace("**Account and origin guard again.**", "", 1),                 # no origin check before the push
         good.replace("**POPIA release check.**", "", 1),                            # no POPIA check before the push
         good.replace("**Back up state**", "", 1),                                   # no backup step
+        good.replace("**On main.**", "", 1),                                        # no main check before the publish
         good.replace("   `cd /workspace/publicfunds && scripts/backup-state.sh",   # backup moved before the publish
                      "   `cd /workspace/publicfunds && scripts/backup-state.sh", 1).replace(
             "   Before the publish command, in this order (CHG-2026-066):\n",
@@ -594,3 +619,161 @@ def test_no_agent_id_or_other_account_in_committed_text():
         t = f.read_text(encoding="utf-8")
         assert not uuid.search(t), f
     assert "<orchestrator agent id from the private deploy notes>" in routine_prompt(ROUTINE.read_text(encoding="utf-8"))
+
+
+# CHG-2026-066 follow-up: incidents only on `incidents/local`, the 2-hour wait cap, the main check before the publish.
+
+def incidents_ok(master: str, routine: str) -> bool:
+    prompt = routine_prompt(routine)
+    old = ("commit it locally", "(no push)", "committed locally")
+    return (INCIDENTS_BLOCK in master and master.count(INCIDENT) == 3
+            and "never on `main`" in master and "`incidents/local` is never pushed" in master
+            and "never switches branches, so every pull and the publish run on `main`" in master
+            and "push" not in INCIDENT_WT_CMD + INCIDENT_COMMIT_CMD
+            and master.find(INCIDENTS_BLOCK) < master.find("\n0. ")
+            and "only on the local branch `incidents/local`" in prompt and "that branch is never pushed" in prompt
+            and not any(o in master or o in prompt for o in old))
+
+
+def test_incidents_go_only_to_the_local_incidents_branch():
+    assert incidents_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_incidents_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace(INCIDENT, "Record an incident with **publicfunds-itil** and commit it locally (no push).", 1), r),
+        (m.replace("never on `main`. ", "", 1), r),                                  # main no longer excluded
+        (m.replace("`incidents/local` is never pushed", "`incidents/local` is pushed", 1), r),
+        (m.replace(INCIDENTS_BLOCK, "", 1), r),                                      # no command sequence
+        (m.replace(" and never switches branches, so every pull and the publish run on `main`", "", 1), r),
+        (m, r.replace("that branch is never pushed", "push that branch", 1)),
+        (m, r.replace("only on the local branch `incidents/local`", "on `main`", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not incidents_ok(bm, br)
+
+
+def wait_cap_ok(master: str, routine: str) -> bool:
+    s0 = master[master.find("\n0. "):master.find("\n1. ")]
+    prompt = routine_prompt(routine)
+    order = prompt[prompt.find("- the ACTION lines first"):]
+    return (WAIT_CMD in s0 and "Check again every 60 s, for up to 120 minutes." in s0
+            and "If it still prints `running` after 120 minutes, begin the report with exactly `" + NIGHTLY_SKIPPED + "`" in s0
+            and "record an incident (see \"Incidents\")" in s0
+            and "do nothing else: no pull, no publish, no push; skip steps 1 to 6." in s0
+            and "wait for it to end" not in s0
+            and s0.find(NIGHTLY_SKIPPED) < s0.find("git fetch -q origin")
+            and "a nightly skipped because another run was still in progress after 2 hours" in prompt
+            and "its ACTION line is the only one: `" + NIGHTLY_SKIPPED + "`" in order)
+
+
+def test_wait_for_another_run_is_capped_at_2_hours():
+    assert wait_cap_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_wait_cap_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("for up to 120 minutes", "until it ends", 1), r),                # no cap
+        (m.replace("every 60 s, for", "every 600 s, for", 1), r),
+        (m.replace(NIGHTLY_SKIPPED, "ACTION: nightly skipped", 1), r),               # not the exact ACTION line
+        (m.replace("no pull, no publish, no push; skip steps 1 to 6.", "then go on with step 1.", 1), r),
+        (m.replace("record an incident (see \"Incidents\"), ", "", 1), r),
+        (m, r.replace("a nightly skipped because another run was still in progress after 2 hours, ", "", 1)),
+        (m, r.replace("its ACTION line is the only one: `" + NIGHTLY_SKIPPED + "`", "it adds no ACTION line", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not wait_cap_ok(bm, br)
+
+
+def main_check_ok(master: str, routine: str) -> bool:
+    s4 = master[master.find("\n4. "):master.find(PUBLISH_CMD)]
+    return ("**On main.** Run `git -C /workspace/publicfunds rev-parse --abbrev-ref HEAD`. If it does not print `main`, "
+            "do not publish and do not switch branches; begin the report with `" + NOT_ON_MAIN + "`" in s4
+            and "`" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)` "
+            "is the only publish ACTION line" in master
+            and "`" + NOT_ON_MAIN + "`, `ACTION: account or origin check failed` or `ACTION: publish blocked (POPIA)`" in routine_prompt(routine))
+
+
+def test_main_check_before_the_publish():
+    assert main_check_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_main_check_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("rev-parse --abbrev-ref HEAD`. If it does not print `main`", "status`. If it is not clean", 1), r),
+        (m.replace("do not publish and do not switch branches", "run `git switch main`", 1), r),
+        (m.replace("`" + NOT_ON_MAIN + "`, `ACTION: account", "`ACTION: account", 1), r),
+        (m, r.replace("`" + NOT_ON_MAIN + "`, ", "", 1)),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not main_check_ok(bm, br)
+
+
+def test_publish_script_commits_on_the_current_branch_and_refuses_a_push_off_main():
+    """The reason for the main check: the script commits public-data/ on the current branch, then refuses the push (exit 4)."""
+    script = (D.parents[2] / "scripts" / "publish-public-data.sh").read_text(encoding="utf-8")
+    commit = script.find('git commit -q -m "data: refresh public-data/v1')
+    branch = script.find('BR="$(git rev-parse --abbrev-ref HEAD)"')
+    push = script.find("git push -q origin HEAD:main")
+    assert 0 <= commit < branch < push
+    assert '[[ "$BR" == "main" ]] || { log "refusing to push from branch $BR (main only)"; exit 4; }' in script
+
+
+# A real git check of the incident commands, in a temporary repo with a bare remote. The commands are the master's own
+# (only the two paths are changed), so this checks the text that the nightly runs.
+
+
+def _git_env(tmp: Path) -> dict:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"), GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="t",
+               GIT_AUTHOR_EMAIL="t@localhost", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@localhost", HOME=str(tmp))
+    return env
+
+
+def _sh(cmd: str, cwd: Path, env: dict) -> str:
+    return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _incident_repo(tmp_path):
+    env = _git_env(tmp_path)
+    bare, main = tmp_path / "remote.git", tmp_path / "publicfunds"
+    inc = tmp_path / "publicfunds-incidents"
+    _sh(f"git init -q --bare -b main {bare} && git clone -q {bare} {main}", tmp_path, env)
+    _sh("mkdir -p itil public-data && echo seed > itil/README && echo v0 > public-data/x && git add -A && "
+        "git commit -q -m seed && git branch -M main && git push -q origin HEAD:main", main, env)
+
+    def run(cmd: str) -> str:
+        cmd = cmd.strip("`").replace("/workspace/publicfunds-incidents", str(inc)).replace("/workspace/publicfunds", str(main))
+        return _sh(cmd, tmp_path, env)
+
+    assert run(INCIDENT_WT_CMD) == "0"
+    assert run(INCIDENT_WT_CMD) == "0"                                   # a second incident in the same run: no error
+    (inc / "itil" / "INC-test.md").write_text("incident\n")
+    assert run(INCIDENT_COMMIT_CMD) == "0"
+    incident = _sh("git rev-parse HEAD", inc, env)
+    return env, bare, main, inc, incident
+
+
+def test_incident_commit_never_reaches_the_remote_main(tmp_path):
+    env, bare, main, inc, incident = _incident_repo(tmp_path)
+    assert _sh("git rev-parse --abbrev-ref HEAD", main, env) == "main"   # the main checkout never left main
+    assert _sh("git rev-parse --abbrev-ref HEAD", inc, env) == "incidents/local"
+    _sh("echo v1 > public-data/x && git add -- public-data/ && git commit -q -m data && git push -q origin HEAD:main", main, env)
+    remote_main = _sh("git rev-parse main", bare, env)
+    assert remote_main == _sh("git rev-parse HEAD", main, env)
+    assert incident not in _sh("git rev-list main", bare, env).split()   # the incident commit is not in the remote main
+    assert "incidents/local" not in _sh("git branch -a", bare, env)
+    assert not (main / "itil" / "INC-test.md").exists()
+
+
+def test_pushing_head_main_from_the_incidents_branch_would_publish_the_incident(tmp_path):
+    """Must-fail case: the same push from incidents/local carries the incident into main. This is why the checks matter."""
+    env, bare, main, inc, incident = _incident_repo(tmp_path)
+    _sh("git push -q origin HEAD:main", inc, env)
+    assert incident in _sh("git rev-list main", bare, env).split()
