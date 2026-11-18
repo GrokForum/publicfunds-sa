@@ -8,7 +8,7 @@
 | Environment | DEV: a fresh mirror clone, held privately on the author's computer (all rewrite work and all checks). PROD: the GitHub repo GrokForum/publicfunds-sa and its GitHub Pages site (https://publicfunds.grokforum.site/). There is no TEST host for a history rewrite; the full check of the rewritten mirror (section 7) is the test. |
 | Depends on | PR #18 (CHG-2026-067 code) merged, and the first nightly publish after that merge masked the live data (pre-check P1). |
 | CIs affected | The GitHub repo (all branches, tags and commit SHAs); `public-data/v1/awards-2021.json`, `awards-2023.json`, `awards-2024.json`, `awards-2025.json` in every historic commit; GitHub Pages (rebuild); GitHub Actions `github-pages` artifacts; the production checkout of the nightly and every local clone and worktree; this record; `itil/registers/change-log.md`; `STATUS.md`. |
-| Linked records | CHG-2026-067 (title masks, Q4 and Q6); CHG-2026-069 (separate public site repository, RFC head `3756dcd3`, section 16); CHG-2026-050 and CHG-2026-051 (fresh repo, first public commit `b063190`); CHG-2026-066 (nightly duties, account and origin guard, `incidents/local`); CHG-2026-044 (state backup); CHG-2026-061 (live check); CHG-2026-063 (robots); RSK-021, RSK-023 |
+| Linked records | CHG-2026-067 (title masks, Q4 and Q6); CHG-2026-069 (separate public site repository, record `itil/changes/CHG-2026-069-public-site-repo.md` / PR #20; RFC head `3756dcd3` is superseded, section 16); CHG-2026-050 and CHG-2026-051 (fresh repo, first public commit `b063190`); CHG-2026-066 (nightly duties, account and origin guard, `incidents/local`); CHG-2026-044 (state backup); CHG-2026-061 (live check); CHG-2026-063 (robots); RSK-021, RSK-023 |
 | Rollback | Force-push the private mirror backup (the S1 copy taken just before S2) back to GitHub, while that backup is kept (Q4). A `--mirror` push from that backup also deletes any branches created after S1. After the backup is deleted, there is no rollback. A restore after the nightly routine resumes also overwrites later commits. See section 10. |
 
 ## 1. What and why
@@ -284,7 +284,7 @@ Owner decision relayed 18 Nov 2026 07:51 SAST: the remaining questions will be a
 
 ## 16. Effect of CHG-2026-069
 
-CHG-2026-069 (draft RFC, branch `chg-2026-069-public-site-repo`, head `3756dcd31dd53fe64772492be66be678a2f5bffd`) plans a separate public GrokForum repository that holds only the built site files, with fresh history and no data-repository `refs/pull` residue, and a later change that makes GrokForum/publicfunds-sa private. That later visibility change is not part of CHG-2026-069.
+CHG-2026-069 (draft RFC, record `itil/changes/CHG-2026-069-public-site-repo.md` / PR #20; earlier head `3756dcd3` is superseded) plans a separate public GrokForum repository that holds only the built site files, with fresh history and no data-repository `refs/pull` residue, and a later change that makes GrokForum/publicfunds-sa private. That later visibility change is not part of CHG-2026-069.
 
 This rewrite is not automatically cancelled. The values stay in the data repository until a rewrite runs, or until that repository is no longer public. A private repository still keeps the values in its history and in its `refs/pull/*` for anyone with access.
 
