@@ -19,6 +19,7 @@ from matplotlib.colors import ListedColormap  # noqa: E402
 from jinja2 import Environment, select_autoescape  # noqa: E402
 
 from thusa.format import format_amount, format_count, format_rand, format_rand_prose  # noqa: E402
+from thusa.publish_data import muni_profile_url  # noqa: E402
 from thusa.settings import Paths  # noqa: E402
 
 STATE_ORDER = ["present", "partial", "missing", "n.a."]
@@ -214,7 +215,7 @@ table below as budget-only. eTenders awards are shown separately and are not in 
 MUNI = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{{ m.name }} - Thusa</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>{{ css }}</style></head><body>
 <header><h1>{{ m.long_name }} ({{ m.demarcation_code }}, {{ m.body_type }})</h1><p><a style="color:#9cf" href="../index.html">&larr; overview</a> ·
-<a style="color:#9cf" href="https://municipalmoney.gov.za/profiles/municipality-{{ m.demarcation_code }}/">Municipal Money profile</a></p></header><main>
+<a style="color:#9cf" href="{{ profile_url(m.demarcation_code, m.body_type) }}">Municipal Money profile</a></p></header><main>
 <div class="banner">Automated snapshot. Blank / "unknown" = not published in the loaded sources; it is never shown as zero. Flags are unreviewed.</div>
 <h2>Coverage</h2><table><tr><th>Data type</th>{% for y in years %}<th>{{ y.fy_label }}</th>{% endfor %}</tr>
 {% for t in types %}<tr><td>{{ labels[t] }}</td>{% for y in years %}{% set c = cov.get((t, y.fye)) %}
@@ -248,6 +249,7 @@ def render(paths: Paths, screenshot: bool = True) -> dict:
     env.globals["rand_short"] = rand_short
     env.globals["amount"] = format_amount
     env.globals["count"] = format_count
+    env.globals["profile_url"] = muni_profile_url        # CHG-2026-067 (F-03): district-CODE/ for districts
     flags = _rows(con, """SELECT * FROM marts.flag ORDER BY
         CASE severity WHEN 'high' THEN 0 WHEN 'med' THEN 1 WHEN 'low' THEN 2 ELSE 3 END, score DESC""")
     for f in flags:
