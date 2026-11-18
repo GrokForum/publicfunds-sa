@@ -192,6 +192,40 @@ def test_privacy_page_sections_party_contact_and_regulator():
     assert "<script" not in html.lower()
 
 
+RIGHTS = {"access": "You can ask whether we hold information about you, and ask for a copy of it, by e-mail to",
+          "correction and objection": "You can ask for a correction of your information, or object to its processing, by e-mail to",
+          "complaint": "You can also complain to the <a href=\"https://inforegulator.org.za/\">Information Regulator (South Africa)</a>."}
+
+
+def rights_problems(html: str) -> list[str]:
+    """POPIA s18 rights in section 8: access, correction and objection through the role mailbox, and a complaint to the
+    Information Regulator."""
+    m = re.search(r'<section id="rights">(.*?)</section>', html, re.S)
+    if not m:
+        return ["no rights section"]
+    sec = m.group(1)
+    p = [f"no {k} right" for k, text in RIGHTS.items() if text not in sec]
+    for k in ("access", "correction and objection"):
+        if RIGHTS[k] in sec and not re.search(re.escape(RIGHTS[k]) + r' <a href="mailto:[^"]+">', sec):
+            p.append(f"the {k} right has no role mailbox link")
+    return p
+
+
+def test_privacy_page_rights_include_access():
+    assert rights_problems(PRIVACY.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize("right", sorted(RIGHTS))
+def test_must_fail_privacy_page_without_a_right(right):
+    html = PRIVACY.read_text(encoding="utf-8").replace(RIGHTS[right], "")
+    assert f"no {right} right" in rights_problems(html)
+
+
+def test_must_fail_access_right_without_the_mailbox():
+    html = PRIVACY.read_text(encoding="utf-8").replace(RIGHTS["access"] + " <a href=\"mailto:", RIGHTS["access"] + " <a href=\"https://example.org/", 1)
+    assert "the access right has no role mailbox link" in rights_problems(html)
+
+
 def test_must_fail_privacy_page_without_responsible_party():
     html = PRIVACY.read_text(encoding="utf-8").replace("GrokForum", "Example Org")
     assert "The responsible party is GrokForum." not in html

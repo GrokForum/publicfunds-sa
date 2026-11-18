@@ -174,6 +174,7 @@ Does it change which suppliers or people are flagged publicly? No. It reduces wh
 
 **TEST** (local, exact head):
 5. Serve the worktree at 127.0.0.1 and run `scripts/dashboard_check.py`, headless Chrome with axe (section 4), and a sample of the new district links and the outbound links.
+   - Before the deploy, check the Information Regulator link on the privacy page (`https://inforegulator.org.za/`) by hand in a browser. It did not answer from the box at the build (section 14, departure 10).
 6. Two independent reviewers check the exact head (expert, shadow, charter, drift).
 
 **PROD** (only after the owner's GO naming the exact head):
@@ -289,7 +290,7 @@ popia-review: **PASS**. The record names no private person, no supplier name, no
 
 ## 14. Implementation (18 Nov 2026, DEV)
 
-The author implemented sections 3 and 4 on 18 Nov 2026 between 07:06 and 07:22 SAST, in a local worktree of branch `chg-2026-067-impl` from `main` `76688eca`. The commit did not touch `public-data/`, the publish script, the live skill or the routine prompt.
+The author implemented sections 3 and 4 on 18 Nov 2026 between 07:06 and 07:22 SAST, in a local worktree of branch `chg-2026-067-impl` from `main` `76688eca`. The build did not touch `public-data/`, `scripts/publish-public-data.sh`, the live skill or the routine prompt. It changed `thusa/publish_data.py` (the export module that the nightly publish runs through `pf publish-data`): item 3 (a) and (d) (district profile helper, sub-counts) and item 4 (title masks, `doc` null on masked rows, fail-closed scan). That is why the type is Normal-high.
 
 **Files changed:** `apps/public-dashboard/index.html`, `index.html`, new `404.html`, new `privacy/index.html`, `.gitignore`, `thusa/publish_data.py`, `thusa/detectors.py`, `thusa/report.py`, `config/public-data.yaml`, `apps/public-dashboard/README.md`, `apps/public-dashboard/GROK_BUILD_PROMPT.md`, new `tests/test_site_draft_privacy.py`, new `tests/test_supplier_mask.py`, `tests/test_publish_data.py`, this record, `itil/registers/change-log.md`, `itil/registers/ci-register.md`, `STATUS.md`.
 
@@ -311,7 +312,7 @@ The author implemented sections 3 and 4 on 18 Nov 2026 between 07:06 and 07:22 S
 7. Stub CSP: `default-src 'none'; img-src data:; base-uri 'none'; form-action 'none'`. `img-src data:` was added because headless Chrome logged a CSP error for the stub's inline `data:` favicon with the RFC's policy.
 8. Privacy page section 6 says the masks apply "from the first nightly publish after this notice took effect" (plain words for the public) instead of "after the merge".
 9. No `about` line was added to the award files (the RFC names none), so award files change only in the masked cells.
-10. The Information Regulator link (`https://inforegulator.org.za/`) did not answer from the box on 18 Nov 2026 (curl: 4 tries, 15 to 20 s each, no response; a web fetch: HTTP 504); a web search index lists it as the regulator's home page. **[link not checked from the box; unverified]**
+10. The Information Regulator link (`https://inforegulator.org.za/`) did not answer from the box on 18 Nov 2026 (curl: 4 tries, 15 to 20 s each, no response; a web fetch: HTTP 504); a web search index lists it as the regulator's home page. **[link not checked from the box; unverified]** It is checked by hand in TEST before the deploy (section 6, step 5).
 
 **Tests (DEV):** `uv run pytest -q` on the worktree before the commit (18 Nov 2026, 07:21 SAST): 1,052 passed, 61 skipped (base `76688eca`: 961 passed, 61 skipped; 91 new tests). New tests: `tests/test_site_draft_privacy.py` (pages, banner, robots, CSP, referrer, privacy sections, contact rules, issue-form links, node tests of `database` and `fresh` with must-fail cases), `tests/test_supplier_mask.py` (rule, masks, Inc exception, organisation words, official names, export on a copy of the synthetic warehouse, no-op mask refused, masked row with `doc` refused, district profile and counts) and 4 cases in `tests/test_publish_data.py`.
 
@@ -335,6 +336,9 @@ The author implemented sections 3 and 4 on 18 Nov 2026 between 07:06 and 07:22 S
 
 **POPIA (popia-review):** PASS. The change reduces published personal data (5 masks, 5 `doc` links removed). This record, the tests and the commit name no private person, no supplier name and no owner account; tests use invented names only.
 
+**Rev 4 (18 Nov 2026, reviewer A's finding on `cd2924c6`):** reviewer A passed `cd2924c6` (draft PR #18, as reported by the orchestrator to the author) and asked for the right of access in the privacy page. Section 8 "Your rights" of `privacy/index.html` now also says that a person can ask whether the site holds information about them, and ask for a copy of it, through the role mailbox (POPIA section 18). Correction, objection and the complaint to the Information Regulator stayed. `tests/test_site_draft_privacy.py` got `rights_problems()`, a test that requires access, correction and objection and the complaint, and must-fail cases (each right removed; the access right without the mailbox link). A TEST step was added to section 6: check the Information Regulator link by hand before the deploy. The link stays marked unverified in this record. `uv run pytest -q` with Rev 4 (18 Nov 2026, 07:37 SAST): 1,057 passed, 61 skipped.
+Rev 4 also corrected two record errors from reviewer B's PASS with concerns on `cd2924c6`: (1) section 14 said that the commit did not touch "the publish script"; it now names `scripts/publish-public-data.sh` as the untouched file and says that `thusa/publish_data.py` changed, and why; (2) the STATUS line said "one local commit"; it now says that the branch has three commits above `76688eca` (the build, the time correction and this fix) and that draft PR #18 was opened.
+
 ## Revisions
 
 - Rev 1 (18 Nov 2026, 05:43 SAST, commit `cdba9ab6`), after reviewer A's PASS with concerns on `0a21e0e0`: (1) the mask rule exempts `Inc` when a personal title leads the value, and organisation words match as whole words, case-insensitive; a recheck on the data gave 5 values (4 without the exception); (2) the record says that the export scan catches a lost or no-op mask, not a gap in the rule; (3) the privacy page plan has "Purpose and basis" and "Your rights" sections (POPIA section 18(1)); (4) box paths were replaced by role wording ("the live skill (outside the repo)", "a local worktree"). No code changed.
@@ -342,6 +346,7 @@ The author implemented sections 3 and 4 on 18 Nov 2026 between 07:06 and 07:22 S
 - Rev 2 (18 Nov 2026, on `cdba9ab6`): the responsible party is GrokForum (Owner answer, 18 Nov 2026 06:32 SAST, as relayed by the orchestrator to the author); the placeholder and its [unverified] flag were removed, and [unverified] stays only on the legal-basis wording; the Q2 entry in section 12 and the privacy-page test were updated; the change-log row states that the owner decided the contact channel (role mailbox, Q1, 18 Nov 2026 05:40 SAST); the Rev 1 time was corrected to the commit time (05:43 SAST); the STATUS line was updated. No code changed.
 
 - Rev 3 (18 Nov 2026, implementation on branch `chg-2026-067-impl` from `76688eca`): section 14 added; the Status field records the RFC merge, the post-merge tag and the implementation.
+- Rev 4 (18 Nov 2026, after reviewer A's PASS and reviewer B's PASS with concerns on `cd2924c6`): right of access added to privacy page section 8, with its test; TEST step for the Information Regulator link added; section 14 names `scripts/publish-public-data.sh` as untouched and records the `thusa/publish_data.py` change; STATUS commit count and draft PR #18 corrected (section 14, Rev 4).
 
 ## Post-implementation review
 - Outcome: (written after the build, review and GO)
