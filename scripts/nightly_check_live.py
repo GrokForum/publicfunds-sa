@@ -1,31 +1,43 @@
 #!/usr/bin/env python3
-"""Nightly after-publish live check (CHG-2026-061, CSI-036, RB-12).
+"""Nightly after-publish live check (CHG-2026-061, CSI-036, RB-12; site push input from CHG-2026-070).
 
-Run it after `scripts/publish-public-data.sh --push`, with that script's exit code and its saved output:
+Run it after `scripts/publish-public-data.sh --push` and then `scripts/publish_site_repo.py`, with both exit codes and
+their saved output:
 
     scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?
-    python3 scripts/nightly_check_live.py --publish-exit <code> --publish-log data/publish-run.log
+    uv run python scripts/publish_site_repo.py > data/site-publish.log 2>&1; echo $?     (only after a data exit 0)
+    python3 scripts/nightly_check_live.py --publish-exit <code> --publish-log data/publish-run.log \
+        --site-exit <code, or not-run> --site-log data/site-publish.log
 
-It decides if the publish pushed. If it did, it runs the after-publish command from RB-12 (unchanged):
+It decides if the data publish pushed, and if the site push pushed. It runs the after-publish command from RB-12
+(RAW_URL is the site repository's raw manifest since CHG-2026-070):
 
     python3 scripts/check_live.py --expect-local public-data/v1/manifest.json \
-      --raw-url https://raw.githubusercontent.com/GrokForum/publicfunds-sa/main/public-data/v1/manifest.json --wait 600
+      --raw-url https://raw.githubusercontent.com/GrokForum/publicfunds-site/main/public-data/v1/manifest.json --wait 600
+
+When it runs check_live (CHG-2026-069 section 4.5):
+    - the site push pushed (also on a night when the data publish had nothing to commit);
+    - the data publish pushed and the site push had no change;
+    - the site push was blocked, failed, did not run after a data exit 0, or gave no known line. check_live still
+      runs, so a stale live tree is visible.
+    If neither push pushed (data: nothing to commit or only timestamps; site: no change), check_live is skipped.
 
 Exit code of this wrapper, and what the routine does next:
     0 = check_live exit 0 (OK, or WARN only). Report any [WARN] lines and carry on.
     1 = check_live exit 1 (at least one [BREACH]). The wrapper reports it, runs the review-app health check
         (curl -s http://127.0.0.1:8765/healthz) and prints its result. Then stop. Never re-publish. Follow RB-12.
     2 = check failed: check_live exit 2 (bad command line, nothing checked), any other exit code, a crash, or the
-        overall time limit. Also exit 2 when the wrapper cannot tell if the publish pushed (no known log line, an
+        overall time limit. Also exit 2 when the wrapper cannot tell if the data publish pushed (no known log line, an
         unreadable log, an unexpected publish exit code, a git or ls-remote error, or origin/main has moved past
-        the data commit), and for a bad wrapper command line or --help. Report it as a failed check and stop.
-        Never report it as OK.
-    3 = skipped: the log or exit code shows positively that the publish did not push. Only these cases:
-        the publish refused (exit 3 or 4); nothing to commit; only timestamps changed; or it committed with no
-        push line and origin/main is still behind that data commit (run without --push). check_live is not run.
+        the data commit), when a site push ran after a refused data publish, and for a bad wrapper command line or
+        --help. Report it as a failed check and stop. Never report it as OK.
+    3 = skipped: the logs or exit codes show positively that nothing was pushed. Only these cases:
+        the data publish refused (exit 3 or 4) and the site push did not run; or the data publish had nothing to
+        commit, only timestamps changed, or it committed with no push line and origin/main is still behind that data
+        commit (run without --push), and the site push had no change. check_live is not run.
         The publish rules in the refresh skill still apply.
 
-Read-only. Standard library only. It writes nothing, and it never runs the publish script or git push.
+Read-only. Standard library only. It writes nothing, and it never runs the publish scripts or git push.
 """
 from __future__ import annotations
 
@@ -36,7 +48,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW_URL = "https://raw.githubusercontent.com/GrokForum/publicfunds-sa/main/public-data/v1/manifest.json"
+# CHG-2026-070: the site repository serves the site; its raw manifest is the git-host measuring point.
+RAW_URL = "https://raw.githubusercontent.com/GrokForum/publicfunds-site/main/public-data/v1/manifest.json"
 WAIT_S = 600
 # RB-12: check_live has no total deadline (the 20 s timeout is per read), so call it under an overall limit.
 OVERALL_TIMEOUT_S = WAIT_S + 600
@@ -51,6 +64,11 @@ _LOG = r"^\[publish-data \d\d:\d\d:\d\d SAST\] "
 PUSHED_RE = re.compile(_LOG + r"pushed to origin/main\s*$", re.M)
 COMMITTED_RE = re.compile(_LOG + r"committed ([0-9a-f]{7,40})\s*$", re.M)
 NOTHING_RE = re.compile(_LOG + r"(no change in public-data/; nothing to commit|only timestamps changed; not committed)\s*$", re.M)
+# Lines printed by scripts/publish_site_repo.py (thusa/site_repo.py), CHG-2026-070.
+SITE_PUSHED_RE = re.compile(r"^site_publish: pushed ([0-9a-f]{40})\s*$", re.M)
+SITE_NOCHANGE_RE = re.compile(r"^site_publish: no change; nothing pushed\s*$", re.M)
+SITE_ACTION_RE = re.compile(r"^ACTION: site publish (?:blocked|failed) \(.*\)\s*$", re.M)
+SITE_NOT_RUN = "not-run"
 
 
 def check_live_cmd() -> list[str]:
@@ -136,6 +154,42 @@ def publish_pushed(exit_code: int, log_text: str | None, run=subprocess.run) -> 
     return UNKNOWN, f"publish committed {short}; origin/main does not contain it and is not behind it; cannot tell if it was pushed"
 
 
+SITE_PUSHED, SITE_NO_CHANGE, SITE_NOT_PUSHED, SITE_DID_NOT_RUN = "pushed", "no change", "no push", "did not run"
+# publish_site_repo.py exit codes: 0 = pushed or no change, 3 = blocked, 4 = failed (CHG-2026-070).
+SITE_BLOCKED_EXIT, SITE_FAILED_EXIT = 3, 4
+
+
+def site_pushed(site_exit: str, log_text: str | None) -> tuple[str, str]:
+    """Did the site push push? Returns (SITE_PUSHED | SITE_NO_CHANGE | SITE_NOT_PUSHED | SITE_DID_NOT_RUN, reason).
+
+    SITE_NOT_PUSHED covers blocked, failed and unknown results: in all of them check_live still runs (section 4.5)."""
+    if site_exit == SITE_NOT_RUN:
+        return SITE_DID_NOT_RUN, "site push did not run"
+    code = int(site_exit)
+    action = SITE_ACTION_RE.search(log_text or "")
+    action_text = f": {_clip(action.group(0))}" if action else ""
+    if code == SITE_BLOCKED_EXIT:
+        return SITE_NOT_PUSHED, f"site push exited 3 (blocked; nothing pushed){action_text}"
+    if code == SITE_FAILED_EXIT:
+        return SITE_NOT_PUSHED, f"site push exited 4 (failed){action_text}"
+    if code != 0:
+        return SITE_NOT_PUSHED, f"site push exited {code}; cannot tell if it pushed"
+    if log_text is None:
+        return SITE_NOT_PUSHED, "site push output not readable; cannot tell if it pushed"
+    m = SITE_PUSHED_RE.search(log_text)
+    if m:
+        return SITE_PUSHED, f"site push pushed {m.group(1)[:12]}"
+    if SITE_NOCHANGE_RE.search(log_text):
+        return SITE_NO_CHANGE, "site push: no change; nothing pushed"
+    return SITE_NOT_PUSHED, "no known pushed or no-change line in the site push output; cannot tell if it pushed"
+
+
+def _site_exit_arg(value: str) -> str:
+    if value == SITE_NOT_RUN or re.fullmatch(r"-?\d{1,3}", value or ""):
+        return value
+    raise argparse.ArgumentTypeError("an exit code or not-run")
+
+
 def _clip(text: str) -> str:
     text = " ".join(text.split())
     return text if len(text) <= MAX_ECHO else text[:MAX_ECHO - 3] + "..."
@@ -172,6 +226,9 @@ def main(argv: list[str] | None = None, run=subprocess.run, out=print) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0], allow_abbrev=False)
     ap.add_argument("--publish-exit", type=int, required=True, help="exit code of the publish step")
     ap.add_argument("--publish-log", type=Path, required=True, help="file with the saved output of that run")
+    ap.add_argument("--site-exit", type=_site_exit_arg, required=True,
+                    help="exit code of scripts/publish_site_repo.py, or not-run")
+    ap.add_argument("--site-log", type=Path, required=True, help="file with the saved output of the site push")
     try:
         a = ap.parse_args(argv)
     except SystemExit as exc:
@@ -185,16 +242,33 @@ def main(argv: list[str] | None = None, run=subprocess.run, out=print) -> int:
         log_text = a.publish_log.read_text(encoding="utf-8", errors="replace")
     except OSError:
         log_text = None
+    site_log = None
+    if a.site_exit != SITE_NOT_RUN:
+        try:
+            site_log = a.site_log.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            site_log = None
     state, why = publish_pushed(a.publish_exit, log_text, run)
-    if state == NOT_PUSHED:
-        out(f"check_live: SKIPPED ({why})")
+    site_state, site_why = site_pushed(a.site_exit, site_log)
+    out(f"site_publish: {site_state} ({site_why})")
+    if a.publish_exit != 0 and site_state != SITE_DID_NOT_RUN:
+        out(f"check_live: FAILED CHECK (a site push ran after data publish exit {a.publish_exit}; the site push must "
+            "run only after a data publish exit 0)")
+        out("NEXT: stop. Report this as a failed check, not as OK. Check by hand what went live.")
+        return EXIT_FAILED
+    # Skip only when neither push pushed: a refused data publish (no site push), or no data push and no site change.
+    if state == NOT_PUSHED and (a.publish_exit != 0 or site_state == SITE_NO_CHANGE):
+        out(f"check_live: SKIPPED ({why}; {site_why})")
         out("NEXT: check_live not run. Follow the refresh skill for the publish result.")
         return EXIT_SKIPPED
-    if state != PUSHED:
+    if state == UNKNOWN:
         out(f"check_live: FAILED CHECK ({why})")
         out("NEXT: stop. Report this as a failed check, not as OK. Check by hand if new data went live.")
         return EXIT_FAILED
-    out(f"check_live: running ({why})")
+    if site_state in (SITE_NOT_PUSHED, SITE_DID_NOT_RUN):
+        out(f"check_live: running ({why}; {site_why}; the live check still runs so a stale live tree is visible)")
+    else:
+        out(f"check_live: running ({why}; {site_why})")
     code, output = run_check(run)
     lines = report_lines(output)
     for l in lines:

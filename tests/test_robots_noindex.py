@@ -42,7 +42,12 @@ def test_pages_serves_the_repo_root_without_jekyll():
     """With .nojekyll, Pages copies files as they are, so Jekyll cannot exclude robots.txt."""
     assert (ROOT / ".nojekyll").is_file()
     assert not (ROOT / "_config.yml").exists()
-    assert (ROOT / "CNAME").read_text().strip() == "publicfunds.grokforum.site"
+    # CHG-2026-070 (CHG-2026-069 S6 and S11): the expected CNAME comes from thusa/site_repo.py, the source of truth for
+    # the site repository. The data-repository CNAME file is checked only while it exists (it may be removed later).
+    from thusa import site_repo
+    assert site_repo.EXPECTED_CNAME == b"publicfunds.grokforum.site\n"
+    if (ROOT / "CNAME").exists():
+        assert (ROOT / "CNAME").read_bytes() == site_repo.EXPECTED_CNAME
 
 
 def test_every_served_html_document_has_noindex_meta():

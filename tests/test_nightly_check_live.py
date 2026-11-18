@@ -1,4 +1,5 @@
-"""scripts/nightly_check_live.py (CHG-2026-061): exit-code handling with a fake runner. No network, no git push, no publish."""
+"""scripts/nightly_check_live.py (CHG-2026-061; site push input from CHG-2026-070): exit-code handling with a fake runner.
+No network, no git push, no publish."""
 import importlib.util
 import subprocess
 import sys
@@ -72,20 +73,45 @@ class FakeRun:
         return [self.kind(c) for c in self.calls]
 
 
-def go(tmp_path, log, exit_code=0, **fake):
+SITE_PUSHED = "site_publish: remote tip 0123456789ab accepted (gate 8)\nsite_publish: pushed " + "e" * 40 + "\n"
+SITE_NOCHANGE = "site_publish: remote tip 0123456789ab accepted (gate 8)\nsite_publish: no change; nothing pushed\n"
+SITE_BLOCKED = "ACTION: site publish blocked (unexpected remote commit)\n"
+SITE_FAILED = "ACTION: site publish failed (push refused or failed; nothing changed by this run)\n"
+
+
+def go_full(tmp_path, log, exit_code=0, site=None, **fake):
+    """Run the wrapper. `site` is (site exit, site log) or "not-run". By default: not-run after a data publish exit
+    other than 0, and a site push with no change after a data exit 0 (so the data result decides, as before)."""
     f = tmp_path / "publish-run.log"
     if log is not None:
         f.write_text(log)
+    if site is None:
+        site = "not-run" if exit_code != 0 else (0, SITE_NOCHANGE)
+    sf = tmp_path / "site-publish.log"
+    if site == "not-run":
+        site_exit = "not-run"
+    else:
+        site_exit = str(site[0])
+        if site[1] is not None:
+            sf.write_text(site[1])
     run, lines = FakeRun(**fake), []
-    code = ncl.main(["--publish-exit", str(exit_code), "--publish-log", str(f)], run=run, out=lines.append)
+    code = ncl.main(["--publish-exit", str(exit_code), "--publish-log", str(f), "--site-exit", site_exit,
+                     "--site-log", str(sf)], run=run, out=lines.append)
     return code, lines, run
+
+
+def go(tmp_path, log, exit_code=0, **fake):
+    """As go_full, with the first line (the site_publish: line) checked and removed."""
+    code, lines, run = go_full(tmp_path, log, exit_code, **fake)
+    assert lines[0].startswith("site_publish: ")
+    return code, lines[1:], run
 
 
 def test_command_is_the_rfc_command():
     cmd = ncl.check_live_cmd()
     assert cmd[0] == sys.executable and cmd[1] == str(ROOT / "scripts" / "check_live.py")
     assert cmd[2:] == ["--expect-local", "public-data/v1/manifest.json", "--raw-url",
-                       "https://raw.githubusercontent.com/GrokForum/publicfunds-sa/main/public-data/v1/manifest.json",
+                       "https://raw.githubusercontent.com/GrokForum/publicfunds-site/main/public-data/v1/manifest.json",
                        "--wait", "600"]
     assert ncl.HEALTHZ_CMD == ["curl", "-s", "http://127.0.0.1:8765/healthz"]
     assert ncl.OVERALL_TIMEOUT_S > ncl.WAIT_S
@@ -144,7 +170,7 @@ def test_time_limit_is_a_failed_check(tmp_path):
 def test_publish_refused_skips(tmp_path, exit_code):
     code, lines, run = go(tmp_path, PUSHED, exit_code=exit_code)
     assert code == 3 and run.calls == []
-    assert lines[0] == f"check_live: SKIPPED (publish exited {exit_code} (refused); nothing was pushed by the script)"
+    assert lines[0] == f"check_live: SKIPPED (publish exited {exit_code} (refused); nothing was pushed by the script; site push did not run)"
 
 
 @pytest.mark.parametrize("exit_code", [1, 2, 5, 127, -1])
@@ -235,6 +261,12 @@ def test_bad_wrapper_command_line_is_a_failed_check(capsys):
     lines = []
     assert ncl.main(["--publish-exit", "x", "--publish-log", "f"], run=FakeRun(), out=lines.append) == 2
     assert lines[-1] == "NEXT: stop. Report this as a failed check, not as OK."
+    for argv in (["--publish-exit", "0", "--publish-log", "f"],                                   # no site input
+                 ["--publish-exit", "0", "--publish-log", "f", "--site-exit", "0"],               # no site log
+                 ["--publish-exit", "0", "--publish-log", "f", "--site-exit", "pushed", "--site-log", "g"]):
+        lines = []
+        assert ncl.main(argv, run=FakeRun(), out=lines.append) == 2
+        assert lines[0].startswith("check_live: FAILED CHECK (bad command line")
 
 
 def test_script_never_publishes_or_pushes():
@@ -262,11 +294,97 @@ def test_real_check_live_exit_codes_no_network(tmp_path, monkeypatch, extra, wan
     monkeypatch.setattr(ncl, "HEALTHZ_CMD", [sys.executable, "-c", "print('healthz-stub')"])
     f = tmp_path / "publish-run.log"
     f.write_text(PUSHED)
+    sf = tmp_path / "site-publish.log"
+    sf.write_text(SITE_PUSHED)
     lines = []
-    code = ncl.main(["--publish-exit", "0", "--publish-log", str(f)], out=lines.append)
+    code = ncl.main(["--publish-exit", "0", "--publish-log", str(f), "--site-exit", "0", "--site-log", str(sf)],
+                    out=lines.append)
     assert code == want
     if want == 1:
         assert any(l.startswith("[BREACH]") for l in lines) and any(l.startswith("RESULT: BREACH") for l in lines)
         assert "healthz: curl exit 0; body: healthz-stub" in lines
     else:
         assert "check_live: exit 2 (bad command line; nothing was checked)" in lines
+
+
+# CHG-2026-070 (CHG-2026-069 section 4.5): the site push result is an input; the live check runs whenever the site
+# pushed, and also after a failed or blocked site push, so a stale live tree is visible.
+
+def test_raw_url_is_the_site_repository_manifest():
+    from thusa import site_repo
+    assert ncl.RAW_URL == site_repo.SITE_RAW_MANIFEST
+    assert ncl.RAW_URL == "https://raw.githubusercontent.com/GrokForum/publicfunds-site/main/public-data/v1/manifest.json"
+    assert "publicfunds-sa" not in ncl.RAW_URL
+
+
+@pytest.mark.parametrize("log", [NOTHING, TIMESTAMPS])
+def test_site_pushed_on_a_night_with_no_data_commit_runs_the_check(tmp_path, log):
+    code, lines, run = go_full(tmp_path, log, site=(0, SITE_PUSHED))
+    assert code == 0 and run.kinds() == ["check"]
+    assert lines[0] == "site_publish: pushed (site push pushed eeeeeeeeeeee)"
+    assert lines[1].startswith("check_live: running (publish: ") and "site push pushed" in lines[1]
+
+
+def test_data_and_site_pushed_runs_the_check(tmp_path):
+    code, lines, run = go_full(tmp_path, PUSHED, site=(0, SITE_PUSHED))
+    assert code == 0 and run.kinds() == ["check"]
+
+
+def test_data_pushed_and_site_no_change_runs_the_check(tmp_path):
+    code, lines, run = go_full(tmp_path, PUSHED, site=(0, SITE_NOCHANGE))
+    assert code == 0 and run.kinds() == ["check"]
+
+
+@pytest.mark.parametrize("log", [NOTHING, TIMESTAMPS])
+def test_neither_push_pushed_skips(tmp_path, log):
+    code, lines, run = go_full(tmp_path, log, site=(0, SITE_NOCHANGE))
+    assert code == 3 and run.calls == []
+    assert lines[1].startswith("check_live: SKIPPED") and "site push: no change" in lines[1]
+
+
+@pytest.mark.parametrize("data_log", [PUSHED, NOTHING, TIMESTAMPS])
+@pytest.mark.parametrize("site,word", [
+    ((3, SITE_BLOCKED), "site push exited 3 (blocked; nothing pushed): ACTION: site publish blocked (unexpected remote commit)"),
+    ((4, SITE_FAILED), "site push exited 4 (failed): ACTION: site publish failed"),
+    ((1, "Traceback ...\n"), "site push exited 1; cannot tell if it pushed"),
+    ((0, ""), "no known pushed or no-change line"),
+    ((0, "site_publish: pushed eeee\n"), "no known pushed or no-change line"),          # not a full commit id
+    ((0, None), "site push output not readable"),
+    ("not-run", "site push did not run"),
+])
+def test_failed_blocked_or_unknown_site_push_still_runs_the_check(tmp_path, data_log, site, word):
+    code, lines, run = go_full(tmp_path, data_log, site=site)
+    assert code == 0 and run.kinds() == ["check"]
+    assert word in lines[0]
+    assert lines[1].startswith("check_live: running (") and "a stale live tree is visible" in lines[1]
+
+
+def test_failed_site_push_with_a_breach_reports_the_breach(tmp_path):
+    code, lines, run = go_full(tmp_path, PUSHED, site=(3, SITE_BLOCKED), check=(1, BREACH_OUT))
+    assert code == 1 and run.kinds() == ["check", "healthz"]
+    assert lines[-1] == "NEXT: stop. Do not re-publish to fix it. Follow RB-12."
+
+
+@pytest.mark.parametrize("exit_code", [3, 4, 5])
+@pytest.mark.parametrize("site", [(0, SITE_PUSHED), (0, SITE_NOCHANGE), (3, SITE_BLOCKED)])
+def test_site_push_after_a_failed_data_publish_is_a_failed_check(tmp_path, exit_code, site):
+    code, lines, run = go_full(tmp_path, PUSHED, exit_code=exit_code, site=site)
+    assert code == 2 and run.calls == []
+    assert lines[1].startswith("check_live: FAILED CHECK (a site push ran after data publish exit")
+
+
+@pytest.mark.parametrize("log", ["", "evidence_guard: pass\n"])
+def test_unknown_data_result_is_still_a_failed_check_when_the_site_pushed(tmp_path, log):
+    code, lines, run = go_full(tmp_path, log, site=(0, SITE_PUSHED))
+    assert code == 2 and "check" not in run.kinds()
+    assert lines[1].startswith("check_live: FAILED CHECK (no known commit, push or no-change line")
+
+
+def test_script_never_runs_the_site_publish():
+    text = (ROOT / "scripts" / "nightly_check_live.py").read_text()
+    code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
+    body = code.split('"""', 2)[2]                        # skip the docstring and comments, which name the helper
+    assert "import" not in body.replace("from __future__ import annotations", "").replace("import argparse", "") \
+        .replace("import re", "").replace("import subprocess", "").replace("import sys", "") \
+        .replace("from pathlib import Path", "")
+    assert '"git", "push"' not in body and "publish_site_repo.py\"" not in body

@@ -25,6 +25,8 @@ LIVE = D / "publicfunds-refresh.LIVE-2026-11-17.md"
 DRAFT = D / "publicfunds-refresh.PROPOSED-CHG-2026-061.md"
 MASTER = D / "publicfunds-refresh.MASTER.md"
 ROUTINE = D / "routine-nightly.PROPOSED.md"
+PREVIOUS = D / "publicfunds-refresh.PREVIOUS-CHG-2026-066.md"
+PREVIOUS_SHA256 = "c80a51338214fbf76e57a77d856a7a80d99d7612259c16bb462ede7a78fc3be1"
 LIVE_SHA256 = "aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b"
 LIVE_PATH = Path("/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md")
 PUBLISH_CMD = "`cd /workspace/publicfunds && scripts/publish-public-data.sh --push > data/publish-run.log 2>&1; echo $?`"
@@ -213,6 +215,38 @@ CHG066_EDITS = (
 )
 
 
+# CHG-2026-070 (CHG-2026-069 step S11): step 4 becomes data push, then site push, then the live check. 6 edits (L to Q)
+# on the CHG-2026-066 text. No other change is allowed.
+SITE_CMD = "`cd /workspace/publicfunds && uv run python scripts/publish_site_repo.py > data/site-publish.log 2>&1; echo $?`"
+WRAPPER_CMD_SITE = ("`python3 scripts/nightly_check_live.py --publish-exit <publish exit code> --publish-log data/publish-run.log "
+                    "--site-exit <site exit code, or not-run> --site-log data/site-publish.log; echo $?`")
+SITE_BLOCK = (
+    "   **Site push** (CHG-2026-070). Only if the publish exited **0** (also when it had nothing to commit or only timestamps changed), run the site publish helper. It checks that the site push URL is GrokForum/publicfunds-site (the site-remote guard), builds the allowlist tree with the expected `CNAME`, runs the mask scan, the POPIA check and the allowlist test on that tree, accepts only the recorded last tip of the site repository (or that tip plus exactly one `CNAME`-only commit), and pushes without force:\n"
+    "   " + SITE_CMD + "\n"
+    "   If the publish exited anything other than 0, do not run the site push; the site exit for the wrapper is `not-run`. Never push to the site repository by hand.\n"
+    "   - Site exit 0: pushed (`site_publish: pushed <commit>`) or no change (`site_publish: no change; nothing pushed`). It adds no ACTION line.\n"
+    "   - Site exit 3: blocked; nothing was pushed. Put the helper's first line (`ACTION: site publish blocked (...)`, for example `ACTION: site publish blocked (unexpected remote commit)`) in the report, after the publish ACTION lines. Do not retry and do not push by hand.\n"
+    "   - Site exit 4 or any other non-zero exit: put `ACTION: site publish failed` in the report, after the publish ACTION lines, and quote the helper's first line. Record an incident (see \"Incidents\"). Do not retry.\n"
+    "   Then, whatever the publish and site exit codes, run the live check wrapper. It only reads; it never publishes or pushes. A failed or blocked site push does not skip it, so a stale live tree is visible:\n"
+    "   " + WRAPPER_CMD_SITE + "\n")
+CHG070_EDITS = (
+    ("Only if step 1 returned **0**: publish, then check the live site (CHG-2026-061, CHG-2026-065).",
+     "Only if step 1 returned **0**: publish to the data repository, then to the site repository, then check the live site (CHG-2026-061, CHG-2026-065, CHG-2026-070)."),  # L
+    ("It covers this data refresh only and updates the live dashboard. Never push anything else and never merge PRs.",
+     "It covers this data refresh only. The site push below, to `main` of GrokForum/publicfunds-site, is covered by the owner's standing approval for the site repository (CHG-2026-070); it pushes only the allowlist tree that the site publish helper builds and checks. Never push anything else and never merge PRs."),  # M
+    ("   Then, whatever the publish exit code, run the live check wrapper. It only reads; it never publishes or pushes:\n   " + WRAPPER_CMD + "\n",
+     SITE_BLOCK),  # N
+    ("   - Put its RESULT: line, any [BREACH] / [WARN] lines, and its check_live:, healthz: and NEXT: lines in the nightly report.\n",
+     "   - Put its site_publish: line, its RESULT: line, any [BREACH] / [WARN] lines, and its check_live:, healthz: and NEXT: lines in the nightly report.\n"),  # O
+    ("   - 3: skipped, because it is clear that the publish did not push (publish exit 3 or 4, or nothing new to push).\n",
+     "   - 3: skipped, because it is clear that nothing was pushed (publish exit 3 or 4, or nothing new to push in the data repository and no change in the site repository).\n"),  # P
+    ("Do it after the live check, also when the wrapper said stop (the backup does not publish).",
+     "Do it after the live check, also when the wrapper said stop (the backup does not publish). A failed or blocked site push does not skip the backup."),  # Q
+    ("Never push anything except the step 4 publish of `public-data/`, and never merge PRs.",
+     "Never push anything except the step 4 publish of `public-data/` and the step 4 site push, and never merge PRs."),  # R
+)
+
+
 def apply_edits(text: str, edits) -> str:
     for old, new in edits:
         assert text.count(old) == 1, old
@@ -224,8 +258,8 @@ ON_REQUEST = "On a run on request, skip this step: do not publish unless the own
 
 
 def expected_master(draft: str) -> str:
-    """The CHG-2026-065 edits, then the CHG-2026-066 edits."""
-    return apply_edits(apply_edits(draft, MASTER_EDITS), CHG066_EDITS)
+    """The CHG-2026-065 edits, then the CHG-2026-066 edits, then the CHG-2026-070 edits."""
+    return apply_edits(apply_edits(apply_edits(draft, MASTER_EDITS), CHG066_EDITS), CHG070_EDITS)
 
 
 def master_structure_ok(text: str) -> bool:
@@ -257,7 +291,7 @@ def test_live_snapshot_is_byte_exact_to_its_sha256():
 
 
 def test_master_is_the_draft_made_final():
-    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 11
+    assert len(MASTER_EDITS) == 9 and len(CHG066_EDITS) == 11 and len(CHG070_EDITS) == 7
     assert MASTER.read_text(encoding="utf-8") == expected_master(DRAFT.read_text(encoding="utf-8"))
 
 
@@ -379,7 +413,9 @@ def test_live_skill_has_not_drifted():
     if not LIVE_PATH.is_file():
         pytest.skip("live skill path is not on this computer")
     live = LIVE_PATH.read_bytes()
-    assert live in (MASTER.read_bytes(), LIVE.read_bytes()), "live skill differs from the master and the snapshot"
+    # CHG-2026-070: until its deploy, the live skill is the CHG-2026-066 master, kept byte for byte as PREVIOUS.
+    assert live in (MASTER.read_bytes(), PREVIOUS.read_bytes(), LIVE.read_bytes()), \
+        "live skill differs from the master, the previous master and the snapshot"
 
 
 def on_request_rule_ok(text: str) -> bool:
@@ -409,9 +445,9 @@ def test_on_request_rule_check_catches_bad_text():
 def test_wrapper_runs_after_every_publish_and_matches_its_exit_codes():
     """The wrapper runs whatever the publish exit code; the skill's exit 3 and 4 wording matches the script."""
     t = MASTER.read_text(encoding="utf-8")
-    assert t.count(WRAPPER_CMD) == 1
-    assert "Then, whatever the publish exit code, run the live check wrapper." in t
-    assert t.index(PUBLISH_CMD) < t.index(WRAPPER_CMD) < t.index("If the publish script exits **3**")
+    assert t.count(WRAPPER_CMD_SITE) == 1 and WRAPPER_CMD not in t
+    assert "Then, whatever the publish and site exit codes, run the live check wrapper." in t
+    assert t.index(PUBLISH_CMD) < t.index(SITE_CMD) < t.index(WRAPPER_CMD_SITE) < t.index("If the publish script exits **3**")
     assert t.count("The wrapper prints `check_live: SKIPPED` and exits 3.") == 2      # publish exit 3 and exit 4
     assert "It prints `check_live: FAILED CHECK` and exits 2." in t                    # any other non-zero publish exit
     import importlib.util
@@ -571,9 +607,10 @@ def order_ok(master: str) -> bool:
     guard0, fetch = i("**Account and origin guard.**"), i("git fetch -q origin")
     on_main, guard4 = i("**On main.**"), i("**Account and origin guard again.**")
     popia, cmd = i("**POPIA release check.**"), i(PUBLISH_CMD)
-    wrapper, backup = i(WRAPPER_CMD), i("**Back up state**")
-    return (master.count(PUBLISH_CMD) == 1 and min(guard0, fetch, on_main, guard4, popia, cmd, wrapper, backup) >= 0
-            and guard0 < fetch < on_main < guard4 < popia < cmd < wrapper < backup)
+    site, wrapper, backup = i(SITE_CMD), i(WRAPPER_CMD_SITE), i("**Back up state**")
+    return (master.count(PUBLISH_CMD) == 1 and master.count(SITE_CMD) == 1
+            and min(guard0, fetch, on_main, guard4, popia, cmd, site, wrapper, backup) >= 0
+            and guard0 < fetch < on_main < guard4 < popia < cmd < site < wrapper < backup)
 
 
 def test_order_of_guard_check_publish_and_backup():
@@ -855,3 +892,48 @@ def test_publish_data_lines_check_catches_bad_text():
     )
     for bad in bads:
         assert not publish_data_lines_ok(bad)
+
+
+# CHG-2026-070: the previous master (the CHG-2026-066 text, deployed 17 Nov 2026) is kept byte for byte as rollback text.
+
+def test_previous_master_is_byte_exact_and_is_the_chg066_text():
+    assert hashlib.sha256(PREVIOUS.read_bytes()).hexdigest() == PREVIOUS_SHA256
+    draft = DRAFT.read_text(encoding="utf-8")
+    assert PREVIOUS.read_text(encoding="utf-8") == apply_edits(apply_edits(draft, MASTER_EDITS), CHG066_EDITS)
+
+
+def site_push_ok(master: str, routine: str) -> bool:
+    """Site push only after a data publish exit 0, before the wrapper; failed or blocked site push still runs the
+    wrapper and the backup; ACTION lines named; never forced or by hand; the routine names the site push."""
+    prompt = routine_prompt(routine)
+    return (master.count(SITE_CMD) == 1 and "Only if the publish exited **0**" in master
+            and "do not run the site push; the site exit for the wrapper is `not-run`" in master
+            and "A failed or blocked site push does not skip it" in master
+            and "A failed or blocked site push does not skip the backup." in master
+            and "`ACTION: site publish blocked (unexpected remote commit)`" in master
+            and "`ACTION: site publish failed`" in master
+            and "pushes without force" in master and "Never push to the site repository by hand." in master
+            and "--force" not in master
+            and "then the site push" in prompt and "then the live check" in prompt
+            and "ACTION: site publish blocked (...)" in prompt and "ACTION: site publish failed" in prompt
+            and "a blocked or failed site push" in prompt)
+
+
+def test_site_push_rules():
+    assert site_push_ok(MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8"))
+
+
+def test_site_push_check_catches_bad_text():
+    m, r = MASTER.read_text(encoding="utf-8"), ROUTINE.read_text(encoding="utf-8")
+    bads = (
+        (m.replace("Only if the publish exited **0**", "Always", 1), r),
+        (m.replace("A failed or blocked site push does not skip it", "A failed site push skips it", 1), r),
+        (m.replace(" A failed or blocked site push does not skip the backup.", "", 1), r),
+        (m.replace("pushes without force", "pushes with --force", 1), r),
+        (m.replace(SITE_CMD, "", 1), r),
+        (m, r.replace("then the site push", "then")),
+        (m, r.replace("a blocked or failed site push", "a failed publish")),
+    )
+    for bm, br in bads:
+        assert (bm, br) != (m, r)
+        assert not site_push_ok(bm, br)

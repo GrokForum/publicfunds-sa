@@ -4,7 +4,8 @@ The master copy of the live `publicfunds-refresh` skill is in this folder (CHG-2
 
 | File | What it is |
 |---|---|
-| `publicfunds-refresh.MASTER.md` | **Master.** The text of the live skill. It is the CHG-2026-061 draft made final: step 4 runs on the nightly run only; it publishes with `--push` every time, only if step 1 returned 0, and then runs `scripts/nightly_check_live.py` whatever the publish exit code. A run on request does not publish unless the owner asks for a publish. The publish wording is all in step 4, after the publish command. |
+| `publicfunds-refresh.MASTER.md` | **Master.** The text of the live skill. It is the CHG-2026-061 draft made final: step 4 runs on the nightly run only; it publishes with `--push` every time, only if step 1 returned 0, and then runs `scripts/nightly_check_live.py` whatever the publish exit code. Since CHG-2026-070, step 4 is: data push, then site push (`scripts/publish_site_repo.py`, only after a data publish exit 0), then the live check. A run on request does not publish unless the owner asks for a publish. The publish wording is all in step 4, after the publish command. |
+| `publicfunds-refresh.PREVIOUS-CHG-2026-066.md` | History and rollback text (CHG-2026-070). A byte-for-byte copy of the CHG-2026-066 master, deployed on 17 Nov 2026 (sha256 `c80a51338214fbf76e57a77d856a7a80d99d7612259c16bb462ede7a78fc3be1`). Do not edit it. |
 | `routine-nightly.PROPOSED.md` | The nightly routine prompt that goes with the master. The prompt runs the skill and does not publish by itself. It holds the quiet rule and the orchestrator agent message on a backup failure, with a placeholder for the agent id (CHG-2026-066). Deploy it together with the master. |
 | `publicfunds-refresh.LIVE-2026-11-17.md` | History and rollback text. A byte-for-byte copy of the live skill of 17 Nov 2026, before CHG-2026-065 (sha256 `aee6514d55b3751271c84a56a537e156f67a98742d09bf5619171b9fb7c0f29b`). Do not edit it. |
 | `publicfunds-refresh.PROPOSED-CHG-2026-061.md` | History. The CHG-2026-061 draft (merged in PR #13). The master replaced it. Do not edit it. |
@@ -18,15 +19,17 @@ The live path is `/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md`. 
 3. Before step 1, save the routine prompt that is live, word for word, in the private deploy notes (mode 0600, never in git) as its rollback text. In the same step as step 1, take the text between the marker lines in `routine-nightly.PROPOSED.md`, replace the placeholder `<orchestrator agent id from the private deploy notes>` with the agent id from the private deploy notes, and make that the routine prompt.
 4. Record the deploy (date and time in SAST, the sha256, who deployed) in the next change record.
 
+CHG-2026-070 adds one deploy step, before step 1: write the private config file `~/.config/thusa/site-publish.json` (mode 0600, never in git) with the keys `titled_values_file` (the private list), `tip_file` (the recorded last tip of the site repository, one 40-hex commit id) and, if wanted, `bundle_dir`. The site publish helper is blocked if it cannot read them.
+
 Do not edit the live skill directly. A change to the live skill is a change to the master, with its own change record, reviews and owner GO, then a deploy.
 
 ## Drift check
 
-`cmp docs/bot/live-skill/publicfunds-refresh.MASTER.md /home/box/agent-data/workflows/publicfunds-refresh/SKILL.md` gives no output when the live skill is the master. Before the first deploy, the live skill is equal to `publicfunds-refresh.LIVE-2026-11-17.md`. `tests/test_live_skill_snapshot.py` runs this check when the live path exists (it is skipped when it does not): the live skill must equal the master or the 17 Nov 2026 snapshot. Any other text is drift and fails the test.
+`cmp docs/bot/live-skill/publicfunds-refresh.MASTER.md /home/box/agent-data/workflows/publicfunds-refresh/SKILL.md` gives no output when the live skill is the master. Before the first deploy, the live skill is equal to `publicfunds-refresh.LIVE-2026-11-17.md`. `tests/test_live_skill_snapshot.py` runs this check when the live path exists (it is skipped when it does not): the live skill must equal the master, the previous master (`publicfunds-refresh.PREVIOUS-CHG-2026-066.md`, until the CHG-2026-070 deploy) or the 17 Nov 2026 snapshot. Any other text is drift and fails the test.
 
 ## Rollback
 
-Copy `publicfunds-refresh.LIVE-2026-11-17.md` byte for byte to the live path, and write back the saved routine prompt from the private deploy notes, in the same step. A repo rollback is `git revert -m 1 <merge commit>`.
+Copy `publicfunds-refresh.LIVE-2026-11-17.md` byte for byte to the live path, and write back the saved routine prompt from the private deploy notes, in the same step. For a rollback of the CHG-2026-070 deploy only, copy `publicfunds-refresh.PREVIOUS-CHG-2026-066.md` instead, and write back the routine prompt saved at that deploy. A repo rollback is `git revert -m 1 <merge commit>`.
 
 ## The template skill
 
