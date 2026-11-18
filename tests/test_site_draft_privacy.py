@@ -61,6 +61,15 @@ def page_problems(html: str) -> list[str]:
     return p
 
 
+def _mail_domain_allowed(mail_domain: str, site_domain: str) -> bool:
+    """Allow the site's CNAME domain, or a parent domain of it (at least two labels)."""
+    site = site_domain.lower().strip(".")
+    mail = mail_domain.lower().strip(".")
+    if "." not in mail:
+        return False
+    return mail == site or site.endswith("." + mail)
+
+
 def contact_problems(addr: str, site_domain: str = SITE_DOMAIN) -> list[str]:
     p = []
     m = re.fullmatch(r"([^@\s]+)@([^@\s]+)", addr)
@@ -69,8 +78,8 @@ def contact_problems(addr: str, site_domain: str = SITE_DOMAIN) -> list[str]:
     local, domain = m.group(1).lower(), m.group(2).lower()
     if domain in PERSONAL_MAIL:
         p.append("personal mail domain")
-    if domain != site_domain.lower():
-        p.append("not on the site's own domain")
+    if not _mail_domain_allowed(domain, site_domain):
+        p.append("not on the site domain or a parent domain")
     if local not in ROLE_WORDS:
         p.append("local part is not a role word")
     return p
@@ -186,8 +195,8 @@ def test_privacy_page_sections_party_contact_and_regulator():
     assert html.count("[unverified]") == 0 and html.count("unverified") == 1      # only on the legal-basis wording
     assert re.search(r'<a href="https://inforegulator\.org\.za/">Information Regulator \(South Africa\)</a>', html)
     mails = set(re.findall(r'href="mailto:([^"?]+)"', html))
-    assert len(mails) == 1, mails
-    assert contact_problems(mails.pop()) == []
+    assert mails == {"privacy@grokforum.site"}, mails
+    assert contact_problems(next(iter(mails))) == []
     assert 'href="/apps/public-dashboard/"' in html
     assert "<script" not in html.lower()
 
@@ -231,8 +240,15 @@ def test_must_fail_privacy_page_without_responsible_party():
     assert "The responsible party is GrokForum." not in html
 
 
+def test_contact_accepts_site_domain_or_parent_domain():
+    assert contact_problems(f"privacy@{SITE_DOMAIN}") == []
+    assert contact_problems("privacy@grokforum.site") == []
+
+
 @pytest.mark.parametrize("addr,why", [
-    ("privacy@example.org", "not on the site's own domain"),
+    ("privacy@example.org", "not on the site domain or a parent domain"),
+    ("privacy@evil.grokforum.site", "not on the site domain or a parent domain"),
+    ("privacy@site", "not on the site domain or a parent domain"),
     ("privacy@gmail.com", "personal mail domain"),
     ("jane.doe@publicfunds.grokforum.site", "local part is not a role word"),
     ("jdoe@publicfunds.grokforum.site", "local part is not a role word"),
