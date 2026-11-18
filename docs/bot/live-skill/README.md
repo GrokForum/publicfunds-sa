@@ -19,7 +19,7 @@ The live path is `/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md`. 
 3. Before step 1, save the routine prompt that is live, word for word, in the private deploy notes (mode 0600, never in git) as its rollback text. In the same step as step 1, take the text between the marker lines in `routine-nightly.PROPOSED.md`, replace the placeholder `<orchestrator agent id from the private deploy notes>` with the agent id from the private deploy notes, and make that the routine prompt.
 4. Record the deploy (date and time in SAST, the sha256, who deployed) in the next change record.
 
-CHG-2026-070 adds one deploy step, before step 1: write the private config file `~/.config/thusa/site-publish.json` (mode 0600, never in git) with the keys `titled_values_file` (the private list), `tip_file` (the recorded last tip of the site repository, one 40-hex commit id) and, if wanted, `bundle_dir`. The site publish helper is blocked if it cannot read them.
+CHG-2026-070 adds one deploy step, before step 1: write the private config file `~/.config/thusa/site-publish.json` (mode 0600, never in git) with the keys `titled_values_file` (the private list), `tip_file` (a private file that holds the recorded last tip of the site repository: one 40-hex commit id plus LF, first written by the S3 run) and, if wanted, `bundle_dir`. The site publish helper is blocked if it cannot read them.
 
 Do not edit the live skill directly. A change to the live skill is a change to the master, with its own change record, reviews and owner GO, then a deploy.
 

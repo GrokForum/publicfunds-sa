@@ -4,7 +4,7 @@
 |---|---|
 | Requested by / date (SAST) | Owner decision, 18 Nov 2026 13:04 SAST, in the orchestrator's chat: option b (S11 as its own change before the switch window; option a as the fallback). |
 | Status | Built in DEV on branch `chg-2026-070-site-repo-publish` from `main` `432a455e` (18 Nov 2026). This record is not a merge GO and not a deploy GO. |
-| Type | **Normal-high** (`itil/change-enablement.md`: the publishing pipeline, distribution, the refresh skill and the routine). One review on the exact head and the owner's GO naming that head (owner rule, 18 Nov 2026 13:13 SAST). The deploy follows the merge, in the CHG-2026-069 window, after S9 and before the 20 Nov 2026 03:00 SAST nightly. |
+| Type | **Normal-high** (`itil/change-enablement.md`: the publishing pipeline, distribution, the refresh skill and the routine). Reviewers: the orchestrator and a critic (owner update, 18 Nov 2026). A merge needs their review of the exact head and the owner's GO naming that head. The owner GO for this change also grants the standing approval for nightly site pushes to `main` of GrokForum/publicfunds-site (CHG-2026-069 Q2). The deploy follows the merge, in the CHG-2026-069 window, after S9 and before the 20 Nov 2026 03:00 SAST nightly. |
 | Environment | DEV: local worktree and temporary local git repositories for the tests. PROD at the deploy: the nightly routine pushes to `main` of GrokForum/publicfunds-site. Pre-change `main` is `432a455ed76c181c02dd81bce5f8c530d238d5ab`. |
 | CIs affected | New CI-121 (`thusa/site_repo.py`, `scripts/publish_site_repo.py`); `scripts/nightly_check_live.py` (`RAW_URL`, site push input); CI-118 (`docs/bot/live-skill/publicfunds-refresh.MASTER.md`, `routine-nightly.PROPOSED.md`, `README.md`, new `publicfunds-refresh.PREVIOUS-CHG-2026-066.md`); `tests/test_site_repo_publish.py` (new), `tests/test_nightly_check_live.py`, `tests/test_live_skill_snapshot.py`, `tests/test_robots_noindex.py`, `tests/test_site_draft_privacy.py`; this record; `itil/registers/change-log.md`; `itil/registers/ci-register.md`; `STATUS.md`. At the deploy: the live refresh skill and the nightly routine prompt (CI-004), and one private config file off git. |
 | Linked records | CHG-2026-069 (step S11, sections 3, 4.1, 4.2, 4.4, 4.5, R11, Q2); CHG-2026-065 and CHG-2026-066 (skill master and routine prompt pattern); CHG-2026-061 (`nightly_check_live.py`); CHG-2026-067 (titled-supplier masks, `doc` null); CHG-2026-063 (robots). |
@@ -52,9 +52,9 @@ The site ACTION line comes after the data-publish ACTION lines and before the li
 
 1. Merge at the exact head after the review and the owner's GO naming that head. Tag the snapshot and run `check_live`.
 2. In `/workspace/publicfunds`, the nightly checkout updates by its own step 0 fast-forward. The deploy does not edit that checkout.
-3. Write the private config file `~/.config/thusa/site-publish.json` (mode 0600): `titled_values_file`, `tip_file` (the file that holds the tip recorded at S3, one 40-hex commit id) and, if wanted, `bundle_dir`.
+3. Write the private config file `~/.config/thusa/site-publish.json` (mode 0600, never in git) with these fields: `titled_values_file` (the private list of titled values, one per line); `tip_file` (a private file that holds one 40-hex commit id plus LF, written by the S3 run with the first published tip, and rewritten by the helper after each site push); and, if wanted, `bundle_dir` (a private folder for a bundle of each published tip).
 4. Save the live routine prompt word for word in the private deploy notes. Copy the master to the live skill path byte for byte, check `sha256sum` and `cmp`, and set the routine prompt from `routine-nightly.PROPOSED.md` with the agent id filled, in the same step (as in CHG-2026-065 and CHG-2026-066).
-5. Record the standing approval for the nightly site push in `changes/CAB-DECISION.md` (CHG-2026-069 Q2), and the deploy time, the sha256 and who deployed in the next change record.
+5. Record in `changes/CAB-DECISION.md` the standing approval for nightly site pushes to GrokForum/publicfunds-site that the owner GO for this change grants (CHG-2026-069 Q2). Record the deploy time, the sha256 and who deployed in the next change record.
 
 The first site push after the deploy is the 20 Nov 2026 03:00 SAST nightly. It accepts the S3 tip plus the GitHub `CNAME` commit of S6.
 
@@ -83,8 +83,8 @@ The first site push after the deploy is the 20 Nov 2026 03:00 SAST nightly. It a
 
 ## 8. Open items
 
-- Q2 of CHG-2026-069: the standing approval for the nightly site push, and the token scope. The helper uses the GrokForum account through `GH_TOKEN` from the step 0 guard. A token that can write only to the site repository is **[unverified]** as set up.
-- The S3 run must record its tip as one 40-hex commit id in the private tip file that the config names.
+- Q2 of CHG-2026-069: the owner GO for this change also grants the standing approval for nightly site pushes to GrokForum/publicfunds-site; the deploy records it in `changes/CAB-DECISION.md`. The token scope stays open. The helper uses the GrokForum account through `GH_TOKEN` from the step 0 guard. A token that can write only to the site repository is **[unverified]** as set up.
+- The S3 run writes the first published tip to the file that the `tip_file` field names: one 40-hex commit id plus LF. Gate 8 blocks every site push if that file holds anything else.
 
 ## 9. Seen, not touched
 
@@ -93,7 +93,7 @@ The first site push after the deploy is the 20 Nov 2026 03:00 SAST nightly. It a
 
 ## Approval
 
-Reviewed by the orchestrator; owner GO in the orchestrator's chat.
+Reviewers: orchestrator and critic. Owner GO in the orchestrator's chat, naming the merged head (recorded in the deploy record).
 
 ## Post-implementation review
 
