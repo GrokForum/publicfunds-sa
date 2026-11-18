@@ -12,6 +12,7 @@ It must work for anyone with a browser: no login, no Grok account, no app instal
   https://publicfunds.grokforum.site/apps/public-dashboard/index.html
 - Use it as the starting point and keep its behaviour, texts and rules.
 - You may restyle it, or split it into components, but don't drop features or safeguards.
+- Keep the DRAFT banner on every page, its "Privacy and contact" link to `/privacy/`, and the same-origin rule for `?data=` (CHG-2026-067).
 - If you cannot fetch the URL, ask me to paste the file.
 
 ## Data (read-only, fetched in the browser)
