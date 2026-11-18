@@ -12,9 +12,9 @@ import re
 import duckdb
 
 from thusa.format import format_rand_prose
+from thusa.publish_data import muni_profile_url
 
 MUNI_API = "https://municipaldata.treasury.gov.za/api/cubes"
-MUNI_PROFILE = "https://municipalmoney.gov.za/profiles/municipality-{code}/"
 OCDS_BULK = "https://data.open-contracting.org/en/publication/143"
 RSR_URL = "https://ocpo.treasury.gov.za/RestrictedSupplier/RestrictedSuppliersReport.pdf"
 
@@ -77,7 +77,7 @@ def d1_overspend(con: duckdb.DuckDBPyConnection, cfg: dict) -> list[dict]:
                  max(sha) AS sha, max(fetched) AS fetched
           FROM l GROUP BY ALL)
         SELECT x.*, coalesce(adjb, orgb) AS budget, CASE WHEN adjb IS NOT NULL THEN 'ADJB' ELSE 'ORGB' END AS basis,
-               g.name, g.demarcation_code, t.total_expenditure_cents AS total_auda
+               g.name, g.demarcation_code, g.body_type, t.total_expenditure_cents AS total_auda
         FROM x JOIN curated.gov_body g USING (gov_body_id)
         LEFT JOIN curated.muni_total t ON t.gov_body_id = x.gov_body_id AND t.fye = x.fye AND t.amount_type = 'AUDA'
         WHERE auda IS NOT NULL AND coalesce(adjb, orgb) >= ? AND auda > coalesce(adjb, orgb) * (1 + ?)
@@ -109,7 +109,7 @@ def d1_overspend(con: duckdb.DuckDBPyConnection, cfg: dict) -> list[dict]:
             [{"label": "Municipal Finance API query (incexp_v2)",
               "url": _muni_query("incexp_v2", r["demarcation_code"], r["fye"], '|period_length.length:"year"'),
               "sha256": r["sha"], "fetched_at_utc": str(r["fetched"])},
-             {"label": "Municipal Money profile", "url": MUNI_PROFILE.format(code=r["demarcation_code"])}],
+             {"label": "Municipal Money profile", "url": muni_profile_url(r["demarcation_code"], r["body_type"])}],
             False))
     # national departments: audit outcome vs final appropriation
     nat = con.execute("""
@@ -247,7 +247,7 @@ def d8_irregular_trend(con, cfg: dict) -> list[dict]:
                  lag(u.amount_cents, 2) OVER w AS prev2, lag(u.fye, 2) OVER w AS prev2_fye
           FROM curated.uifw_line u WHERE uifw_type = 'irregular'
           WINDOW w AS (PARTITION BY gov_body_id ORDER BY fye))
-        SELECT x.*, g.name, g.demarcation_code, ao.opinion_label, ao.report_url
+        SELECT x.*, g.name, g.demarcation_code, g.body_type, ao.opinion_label, ao.report_url
         FROM x JOIN curated.gov_body g USING (gov_body_id)
         LEFT JOIN curated.audit_outcome ao USING (gov_body_id, fye)
         WHERE fye >= ? AND prev_fye = fye - 1 AND prev >= ? AND cur IS NOT NULL AND cur >= ?
@@ -262,7 +262,7 @@ def d8_irregular_trend(con, cfg: dict) -> list[dict]:
         sev = "high" if g >= cfg["high_growth_yoy"] and r["cur"] >= cfg["high_min_amount_rand"] * 100 else "med"
         ev = [{"label": "Municipal Finance API query (uifwexp)",
                "url": _muni_query("uifwexp", r["demarcation_code"], r["fye"]), "sha256": r["sha"]},
-              {"label": "Municipal Money profile", "url": MUNI_PROFILE.format(code=r["demarcation_code"])}]
+              {"label": "Municipal Money profile", "url": muni_profile_url(r["demarcation_code"], r["body_type"])}]
         if r["report_url"]:
             ev.append({"label": f"AGSA audit report ({r['opinion_label']})", "url": r["report_url"]})
         out.append(_flag(

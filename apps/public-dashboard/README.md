@@ -7,7 +7,8 @@ This is the public, no-login website. It is published with **Grok Build** at a g
   - It reads the public data export `public-data/v1/` (`pf publish-data`).
   - By default the data comes from the same origin (`../../public-data/v1/`, i.e. `https://publicfunds.grokforum.site/public-data/v1/`).
     These URLs only work for files that are merged to `main`.
-  - To use another data location, add `?data=<base url>` or set `window.PUBLICFUNDS_DATA_BASE`.
+  - To use another data location on the same origin, add `?data=<base url>` or set `window.PUBLICFUNDS_DATA_BASE`.
+    Only a same-origin path is accepted; any other origin is ignored and the default path is used (CHG-2026-067).
 - `GROK_BUILD_PROMPT.md` is the prompt you paste into grok.com Build mode to publish the app.
   It also explains how to point a custom domain at it.
 

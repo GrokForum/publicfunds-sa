@@ -226,3 +226,37 @@ def test_committed_public_data_is_consistent_safe_and_within_budget():
                           "gov_body_id", "body_name", "period_label", "confirmed_at_sast", "review_reason",
                           "evidence_urls"} for f in fl["confirmed"])
     assert not list(Path(COMMITTED).glob("*.part"))
+
+
+# ---- CHG-2026-067 (F-03, F-04, F-06) ----
+
+def test_muni_profile_url_uses_district_for_districts():
+    assert pdx.muni_profile_url("DC1", "district") == "https://municipalmoney.gov.za/profiles/district-DC1/"
+    for t in ("local", "metro", None, ""):
+        assert pdx.muni_profile_url("ABC", t) == "https://municipalmoney.gov.za/profiles/municipality-ABC/"
+    assert pdx.muni_profile_url("DC1", "district") != "https://municipalmoney.gov.za/profiles/municipality-DC1/"  # must fail
+
+
+def test_detectors_and_report_use_the_profile_helper():
+    for rel in ("thusa/detectors.py", "thusa/report.py"):
+        src = (REPO_ROOT / rel).read_text()
+        assert "profiles/municipality-" not in src and "muni_profile_url" in src, rel
+
+
+def test_export_counts_split_and_http_about_line(paths, svc, tmp_path):
+    _, files, _, _ = _export(paths, tmp_path)
+    c = files["manifest.json"]["counts"]
+    muns = files["municipalities.json"]["municipalities"]
+    assert c["municipalities_current"] + c["municipalities_ceased"] == c["municipalities"] == len(muns)
+    assert c["municipalities_ceased"] == sum(1 for m in muns if m["exists_to"]) >= 1
+    assert {"municipalities_current", "municipalities_ceased"} <= set(pdx.COUNT_LABELS)
+    assert ("audit.report paths under report_prefix are published by Municipal Money as http links; the https form does "
+            "not serve the file (sample of 12, 18 Nov 2026).") in files["municipalities.json"]["about"]
+    for m in muns:
+        kind = "district" if m["type"] == "district" else "municipality"
+        assert m["profile"] == f"https://municipalmoney.gov.za/profiles/{kind}-{m['code']}/"
+
+
+def test_dmpr_terms_url_has_no_semicolon():
+    lic = load_yaml("public-data.yaml")["display_sources"]["dmpr_fuel"]["licence"]
+    assert "Terms-Conditions;" not in lic and "https://www.dmpr.gov.za/Terms-Conditions ." in lic
