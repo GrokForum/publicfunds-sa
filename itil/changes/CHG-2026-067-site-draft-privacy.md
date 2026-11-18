@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Requested by / date (SAST) | The owner set the scope on 18 Nov 2026 at 05:12 SAST, as reported to the author (PublicFunds) by the orchestrator. The scope comes from a read-only QC audit of the live site (18 Nov 2026, 04:51 to 05:10 SAST; 0 critical, 2 high, 7 medium, 8 low findings). This record is a draft RFC. It is not a merge GO and not a deploy GO. |
-| Status | RFC drafted on 18 Nov 2026 (05:30 SAST) on branch `chg-2026-067-site-draft-privacy` from `main` `d688b031` (the nightly data refresh of 18 Nov 2026, build `B20261118T012055Z`). The record holds no code change. The build of the change follows only after reviewer PASSes on this RFC and the owner's decisions on the open questions (section 12). |
+| Status | RFC drafted on 18 Nov 2026 (05:30 SAST) on branch `chg-2026-067-site-draft-privacy` from `main` `d688b031` (the nightly data refresh of 18 Nov 2026, build `B20261118T012055Z`). The record holds no code change. The owner's answers to Q1 to Q7 are recorded in section 12 (Owner answers, 18 Nov 2026 05:40 SAST, as relayed by the orchestrator to the author). The record stays a draft. The merge and the deploy need two reviewer PASSes on the exact head and the owner's GO naming that head. |
 | Type | **Normal-high** (`itil/change-enablement.md`: publishing pipeline and distribution). Item 4 changes `thusa/publish_data.py`, which the nightly publish runs. A merge needs two independent reviewer PASSes on the exact head and then the owner's GO naming that head. The nightly data-refresh exemption does not cover this change. |
-| Environment | DEV: local worktree `/workspace/pf-chg067`. TEST: a local static server of the exact head on 127.0.0.1 with headless Chrome. PROD: GitHub Pages from `main` (https://publicfunds.grokforum.site/). |
-| CIs affected | CI-105 (`apps/public-dashboard/index.html`); root `index.html`; new `404.html` and `privacy/index.html` (new CIs at the build); CI-104 (`thusa/publish_data.py`, `public-data/v1/` at the next nightly publish); `thusa/detectors.py`; `thusa/report.py`; `config/public-data.yaml`; CI-112 (issue forms, only if the owner picks option A in Q1); tests; this record; `itil/registers/change-log.md`; `STATUS.md`. |
+| Environment | DEV: a local worktree of the branch. TEST: a local static server of the exact head on 127.0.0.1 with headless Chrome. PROD: GitHub Pages from `main` (https://publicfunds.grokforum.site/). |
+| CIs affected | CI-105 (`apps/public-dashboard/index.html`); root `index.html`; new `404.html` and `privacy/index.html` (new CIs at the build); CI-104 (`thusa/publish_data.py`, `public-data/v1/` at the next nightly publish); `thusa/detectors.py`; `thusa/report.py`; `config/public-data.yaml`; tests; this record; `itil/registers/change-log.md`; `STATUS.md`. |
 | Linked records | QC audit of 18 Nov 2026 (findings F-01 to F-18); CHG-2026-012 (repo references removed from served files; issue link removed); CHG-2026-040 and CHG-2026-041 (evidence guard); CHG-2026-061, CHG-2026-065, CHG-2026-066 (nightly publish and live check); CHG-2026-063 (robots); CI-117; KE-001; SLO-PD-1 |
 | Rollback | Pre-merge tag `snapshot-YYYY-MM-DD-pre-pf-prNN` on the `main` commit before the merge (NN is the PR number of this change). Then `git revert -m 1 <merge sha>`. See section 9. |
 
@@ -61,15 +61,16 @@ Site pages are the HTML pages of the site: `index.html`, `apps/public-dashboard/
 - New `privacy/index.html` (served at `/privacy/`; GitHub Pages redirects `/privacy` to it). Static HTML, no script. It has the DRAFT banner, the robots meta tag, the CSP and referrer meta tags, and these sections in plain language:
   1. **What this site is.** A draft dashboard of South African public money. It shows indicators, not findings. It is built only from official public records.
   2. **What data it shows.** Official published data only, each figure with its source link (see Sources & method). Tender award records include supplier names as National Treasury's eTenders portal publishes them. A supplier value that carries a personal title is masked (first character, five asterisks, last character). Unconfirmed automated leads are never published, only counted. The export removes anything shaped like an SA ID number.
-  3. **What the site does not do.** No cookies, no analytics, no trackers, no forms, no accounts. (Checked: the dashboard has 0 uses of `cookie`, `localStorage`, `sessionStorage` or analytics code; its only 2 `fetch` calls go to the same-origin data path; the CHG-2026-012 headless Chrome network log showed only same-origin requests.)
-  4. **Corrections and removal.** How to ask for a correction or a removal, through the channel the owner picks in Q1. The text asks the person to identify the record by its page link and award id, and not to send ID numbers, phone numbers or addresses.
-  5. **How long data stays.** Each nightly build replaces the published files. Earlier versions stay in the site's version history (see Q4).
-  6. **Who is responsible.** The text the owner picks in Q2. No personal name and no personal contact.
+  3. **Purpose and basis.** The purpose is public accountability: to help people follow how public money is budgeted, spent, audited and awarded. The site processes only information that public bodies have already published in official public records, and shows it as found with its source. The lawful basis is the processing of information in public records that the data subject or a public body made public, for this accountability purpose **[legal wording unverified]**.
+  4. **What the site does not do.** No cookies, no analytics, no trackers, no forms, no accounts. (Checked: the dashboard has 0 uses of `cookie`, `localStorage`, `sessionStorage` or analytics code; its only 2 `fetch` calls go to the same-origin data path; the CHG-2026-012 headless Chrome network log showed only same-origin requests.)
+  5. **Corrections and removal.** How to ask for a correction or a removal, by e-mail to the role mailbox on the site's own domain (Q1). The text asks the person to identify the record by its page link and award id, and not to send ID numbers, phone numbers or addresses.
+  6. **How long data stays.** Each nightly build replaces the published files. Earlier versions stay in the site's version history, and earlier data commits keep the supplier values as they were published then; the masks apply from the first nightly publish after the merge (Q4).
+  7. **Who is responsible.** The responsible party is named as the project, PublicFunds SA, with the role mailbox as its contact (Q2). No personal name and no personal contact. **[unverified: the legal standing of a project name as the responsible party is not confirmed]**
+  8. **Your rights.** A person can ask for a correction of their information, or object to its processing, through the role mailbox (Q1). A person can also complain to the Information Regulator (South Africa).
+  This list follows the notice items of POPIA section 18(1) (purpose, responsible party, source, rights). The Information Regulator's contact details are linked to its official website, checked at the build.
 - Link "Privacy and contact" (`/privacy/`) from: the DRAFT banner on every page, the dashboard footer, the stub, `404.html`, and the privacy page itself (link to the dashboard).
-- Contact channel (Q1). The author proposes, for the owner's choice:
-  - **B (recommended):** a role mailbox on the site's own domain (for example a `privacy@` alias), created by the owner and forwarded where he wants. A data subject can write without making the request public.
-  - **A:** a new issue form `.github/ISSUE_TEMPLATE/privacy-request.yml` on the public repo, linked from the site. This reverses CHG-2026-012 item 2 (it shows the repo again), and a public issue links the requester's GitHub account to the record. The author advises A only for corrections, not for removal requests.
-  - The build test fails if the contact is a personal mailbox domain (for example gmail, outlook, yahoo, icloud) or any address that is not a role address on the site's domain or the issue-form URL.
+- Contact channel (Q1): a role mailbox on the site's own domain (for example a `privacy@` alias), which the owner creates. A data subject can write without making the request public. The site gets no public issue link; CHG-2026-012 item 2 stays as it is, and no issue form is added.
+  - The privacy page gives the address as a `mailto:` link. The build test fails if the address is not on the site's own domain, if it is on a personal mailbox domain (for example gmail, outlook, yahoo, icloud), if its local part looks like a personal name rather than a role word, or if any page links to a GitHub issue form.
 
 ### 3.3 Item 3: medium findings
 
@@ -81,7 +82,7 @@ Site pages are the HTML pages of the site: `index.html`, `apps/public-dashboard/
 - `apps/public-dashboard/index.html` lines 473 to 474: keep the official link; show its text as `report (http, official link)` for a link that starts with the `report_prefix`; add a `title` attribute: "Official link as published by Municipal Money. The HTTPS form of this address does not serve the file."
 - `thusa/publish_data.py` `municipalities()` `about`: add one line: "audit.report paths under report_prefix are published by Municipal Money as http links; the https form does not serve the file (sample of 12, 18 Nov 2026)."
 - The 857 `lg.treasury.gov.za` HTTPS links stay as they are.
-- Q3 asks the owner whether to keep the http links (proposed) or hide them.
+- Q3: the owner chose to keep the http links as found, with the label `http, official link`.
 
 **(c) Freshness pills (F-05).**
 - `apps/public-dashboard/index.html` lines 334 to 338: put the pill rule in one pure function `freshPill(s, nowMs)` between markers `/* fresh:begin */` and `/* fresh:end */` (so a node test can run it, as for the ceiling block). Rule:
@@ -110,7 +111,7 @@ Site pages are the HTML pages of the site: `index.html`, `apps/public-dashboard/
 | Permissions-Policy | No (there is no meta form). | Not set. Limit recorded. The pages use no camera, microphone, location or similar feature. |
 | HSTS | GitHub sends `max-age=31556952`; `includeSubDomains` and `preload` cannot be set. | No change. |
 
-The only way to send real headers is a proxy or CDN in front of GitHub Pages. That is a DNS and hosting change, out of scope (Q5).
+The only way to send real headers is a proxy or CDN in front of GitHub Pages. Q5: the owner accepted the GitHub Pages header limits for now. They are revisited with the Q7 follow-up change if the hosting moves.
 
 **(f) `?data=` restricted to our origin (F-08).**
 - `apps/public-dashboard/index.html` lines 108 to 109: accept the `?data=` value or `window.PUBLICFUNDS_DATA_BASE` only if `new URL(v, location.href).origin === location.origin`. Otherwise ignore it and use the default same-origin path. Put the block between markers `/* database:begin */` and `/* database:end */` for a node test.
@@ -123,12 +124,13 @@ The only way to send real headers is a proxy or CDN in front of GitHub Pages. Th
 
 - Where: `thusa/publish_data.py`, function `tenders()`, line 242 to 248, where `supplier` is set for each award row. After the existing `(name withheld)` rule and before `scrub()`, call a new function `mask_titled_person(name)`. `pf publish-data` runs this code on every nightly publish and in the POPIA release check (the candidate export), so the mask stays.
 - Rule (the watchers' fixed-length mask):
-  - A value is a titled person if, after removing outer brackets, it begins with one of the titles `Mr`, `Mrs`, `Ms`, `Miss`, `Mx`, `Dr`, `Prof`, `Adv` (any case, optional full stop) followed by a space and more text, and it holds no organisation word (`Pty`, `Ltd`, `CC`, `Inc`, `Limited`, `Municipality`, `Trust`, `NPC`, `SOC`, `Holdings`, `Trading`, `Enterprise(s)`, `Group`, `JV`, `Joint Venture`, `t/a`).
+  - A value is a titled person if, after removing outer brackets, it begins with one of the titles `Mr`, `Mrs`, `Ms`, `Miss`, `Mx`, `Dr`, `Prof`, `Adv` (any case, optional full stop) followed by a space and more text, and it holds no organisation word (`Pty`, `Ltd`, `CC`, `Inc`, `Limited`, `Municipality`, `Trust`, `NPC`, `SOC`, `Holdings`, `Trading`, `Enterprise(s)`, `Group`, `JV`, `Joint Venture`, `t/a`). Organisation words match as whole words, case-insensitive (so `Inc` does not match inside a longer word).
+  - Exception for `Inc`: when a personal title leads the value, `Inc` does not count as an organisation word. In South Africa an `Inc` is a personal-liability company, and its name usually carries the practitioner's own name. So a value such as `DR AB Example Inc` is masked.
   - The mask is the first letter or digit (upper case), then exactly five asterisks, then the last letter or digit (lower case): always 7 characters. A value with fewer than two letters or digits becomes `*******`.
-  - On the build of 18 Nov 2026 the rule masks exactly 5 values (5 rows). All 5 masks begin with `D`, because the first character is the title's first letter.
-- Fail closed: a new final scan in the export raises `UnsafeExport` (nothing written; publish exit 3, `ACTION: publish refused` in the nightly report) if any award `supplier` cell still matches the titled-person rule.
+  - On the build of 18 Nov 2026 the rule masks exactly 5 values (5 rows). The author checked the rule against the 9,551 award rows again on 18 Nov 2026 (05:40 SAST): with the `Inc` exception it gives 5 values (5 rows); without the exception it gives 4, because 1 of the 5 values ends in `Inc`. All 5 masks begin with `D`, because the first character is the title's first letter.
+- Fail closed: a new final scan in the export raises `UnsafeExport` (nothing written; publish exit 3, `ACTION: publish refused` in the nightly report) if any award `supplier` cell still matches the titled-person rule. The scan uses the same rule as the mask. So it catches a mask that is lost or made a no-op (for example by a later code change), not a gap in the rule itself. A titled person that the rule does not match passes both the mask and the scan; the must-fail tests and the nightly POPIA release check are the controls for gaps in the rule.
 - What does not change: municipality names, buyer names and other columns. (6 official municipality names begin with "Dr"; they are public bodies and must stay as published.) `tenders-summary.json` has no supplier names.
-- The masked rows keep their `ocid`, `award_id`, `reference`, `doc` and `src` (see Q6).
+- Masked rows (Q6): keep `ocid`, `award_id`, `reference` and `src`; set `doc` (the tender document link) to null. Unmasked rows keep `doc`. The same `tenders()` code does this, so each nightly publish keeps it.
 - Out of scope, noted only: about 2,057 unique supplier values (2,806 rows; audit count) are two to four words with no organisation word. Some may be private persons. They go to a separate later review. The author's own broader pattern found 2,870 such values; the count depends on the word list, so the later review must fix the rule first.
 
 ## 4. Tests
@@ -137,12 +139,12 @@ The build adds these tests. Each must-fail case is a test that checks the bad in
 
 | Test | Checks | Must-fail cases |
 |---|---|---|
-| `tests/test_site_draft_privacy.py` (new) | Every tracked site page (`index.html`, `apps/public-dashboard/index.html`, `404.html`, `privacy/index.html`) has the DRAFT banner text, a link to `/privacy/`, the robots meta tag once, a CSP meta tag and the referrer meta tag. `404.html` links are absolute. The privacy page has the 6 sections. | A copy of a page without the banner, without the privacy link, or with a second robots meta tag fails. A contact `mailto:` on a personal mail domain, or any address that is not the chosen role address or issue-form URL, fails. |
+| `tests/test_site_draft_privacy.py` (new) | Every tracked site page (`index.html`, `apps/public-dashboard/index.html`, `404.html`, `privacy/index.html`) has the DRAFT banner text, a link to `/privacy/`, the robots meta tag once, a CSP meta tag and the referrer meta tag. `404.html` links are absolute. The privacy page has the 8 sections, including "Purpose and basis" and "Your rights" with a link to the Information Regulator. | A copy of a page without the banner, without the privacy link, or with a second robots meta tag fails. The privacy page names the project as the responsible party and gives the role `mailto:` address. A contact address off the site's domain, on a personal mail domain, or with a personal-name local part fails. Any link to a GitHub issue form on a site page fails. |
 | same file | Dashboard CSP: `connect-src 'self'` only; no `https:`, `http:`, `127.0.0.1` or `localhost` source; `base-uri 'none'`, `form-action 'none'`, `object-src 'none'` present. | A CSP with `connect-src 'self' https:` fails. |
 | node test of `database:begin..end` | Same-origin `?data=` path is used; default is used when no value. | `?data=https://evil.example/`, `//evil.example/`, `http://127.0.0.1:9/` (page on https), `javascript:alert(1)` and `data:,x` are all ignored (the default base is used). |
 | node test of `fresh:begin..end` | The three audit rows (`muni_api`, `nt_budget`, `rsr` on the 18 Nov manifest) give "checked …", not "stale". | `last_checked_sast` older than the SLO gives "stale"; no `last_checked_sast` gives "not checked yet"; `failed` or `blocked` status gives "last check failed". |
 | `tests/test_publish_data.py` (added cases) | `profile` uses `district-` for `body_type` `district` and `municipality-` for others; `counts` has `municipalities_current` + `municipalities_ceased` = `municipalities`; the new `about` line is there. | A district with `municipality-` fails. |
-| `tests/test_supplier_mask.py` (new) | `DR AB Example` gives `D*****e`; `(DR AB Example)` gives `D*****e`; `Mrs. Q Z` gives `M*****z`; a stem with fewer than 2 letters or digits gives `*******`; every mask is 7 characters. | Not masked: `ME Example Builders` (invented company name), `DRYDOCK EXAMPLE TRADING` (invented; no title), `Dr Example Local Municipality` (organisation word), `(name withheld)`. The export raises `UnsafeExport` when `mask_titled_person` is replaced by a no-op and a titled value reaches an award row. Municipality names that begin with "Dr" are unchanged in `municipalities.json`. |
+| `tests/test_supplier_mask.py` (new) | `DR AB Example` gives `D*****e`; `(DR AB Example)` gives `D*****e`; `Mrs. Q Z` gives `M*****z`; `DR AB Example Inc` gives `D*****c` (the `Inc` exception); a stem with fewer than 2 letters or digits gives `*******`; every mask is 7 characters. | Not masked: `ME Example Builders` (invented company name), `DRYDOCK EXAMPLE TRADING` (invented; no title), `Dr Example Local Municipality` (organisation word), `Dr Example Holdings` (organisation word), `(name withheld)`. A masked row has `doc` null and keeps `ocid`, `award_id` and `reference`; an unmasked row keeps `doc`; a masked row with a non-null `doc` fails. The export raises `UnsafeExport` when `mask_titled_person` is replaced by a no-op and a titled value reaches an award row. Municipality names that begin with "Dr" are unchanged in `municipalities.json`. |
 | existing suite | `uv run pytest -q` on the base `d688b031`: 961 passed, 61 skipped (18 Nov 2026, 05:27 SAST). All existing tests must still pass; the robots test (`test_every_served_html_document_has_noindex_meta`) then also covers the two new pages. | |
 | TEST, not pytest | `scripts/dashboard_check.py` on a local server of the exact head: no problems. Headless Chrome with axe on the same 10 views as the audit plus `/privacy/` and a 404 path: 0 violations; DRAFT banner visible; no console errors; network log shows only same-origin requests. | |
 
@@ -150,13 +152,13 @@ The build adds these tests. Each must-fail case is a test that checks the bad in
 
 | Risk | Likelihood × impact | Control |
 |---|---|---|
-| The mask rule misses a titled person, or masks a company. | 2 × 3 = 6 | Fixed title list, organisation-word list, must-fail tests, and the export's fail-closed scan. The nightly POPIA release check still reads the full diff. |
-| Masked names stay public until the first publish after the merge, and stay in the public git history of earlier data commits. | 4 × 3 = 12 | The PR does not touch `public-data/`; the next nightly publish (or a publish the owner asks for, Q4) writes the masks. History rewrite needs a force-push, which the project rules forbid; owner decision in Q4. |
-| A masked row is still traceable through `ocid`, `award_id`, `reference` and `doc` to the eTenders record. | 3 × 2 = 6 | The mask is pseudonymisation against casual matching, not anonymity. Q6 asks whether to drop those fields on masked rows, as the watchers do. |
-| The first nightly after the merge shows changed award files in "What's new" and in the POPIA candidate diff. | 5 × 1 = 5 | Expected. The diff shows 5 supplier cells that change to masks (a reduction of personal data, so PASS). Recorded here so that the nightly reviewer is not surprised. |
+| The mask rule misses a titled person, or masks a company. | 2 × 3 = 6 | Fixed title list, organisation-word list with the `Inc` exception, must-fail tests, and the nightly POPIA release check, which reads the full diff. The export's fail-closed scan catches a lost or no-op mask only, not a gap in the rule. |
+| Masked names stay public until the first publish after the merge, and stay in the public git history of earlier data commits. | 4 × 3 = 12 | The PR does not touch `public-data/`. Q4: the masks take effect at the first nightly publish after the merge, and there is no history rewrite. Earlier data commits keep the names. |
+| A masked row is still traceable through `ocid`, `award_id` and `reference` to the eTenders record. | 3 × 2 = 6 | The mask is pseudonymisation against casual matching, not anonymity. Q6: the `doc` link is dropped on masked rows; `ocid`, `award_id` and `reference` stay. |
+| The first nightly after the merge shows changed award files in "What's new" and in the POPIA candidate diff. | 5 × 1 = 5 | Expected. The diff shows 5 supplier cells that change to masks and 5 `doc` cells that change to null (a reduction of personal data, so PASS). Recorded here so that the nightly reviewer is not surprised. |
 | A tighter CSP blocks something the page needs. | 2 × 3 = 6 | The page fetches only same-origin JSON (2 `fetch` calls, both from `BASE`). TEST runs headless Chrome and checks the console. |
 | `no-referrer` breaks an outbound official link that needs a referrer. | 1 × 2 = 2 | TEST samples the outbound links. |
-| An http audit-report link is blocked or warned by a browser as an insecure download from an HTTPS page. | 3 × 2 = 6 **[unverified]** | The link text says "http, official link". Q3. |
+| An http audit-report link is blocked or warned by a browser as an insecure download from an HTTPS page. | 3 × 2 = 6 **[unverified]** | The link text says "http, official link" (Q3). |
 | A change to the dashboard breaks check_live. | 1 × 4 = 4 | `site.app` looks for `PublicFunds` in the page; the new title and banner keep it. check_live runs after the merge. |
 | The DRAFT banner or footer link is lost in a later Grok Build regeneration of the page. | 2 × 3 = 6 | The new test fails if the banner or link is missing. |
 
@@ -164,10 +166,10 @@ Does it change which suppliers or people are flagged publicly? No. It reduces wh
 
 ## 6. Implementation plan (DEV, TEST, PROD)
 
-**DEV** (worktree `/workspace/pf-chg067`, branch `chg-2026-067-site-draft-privacy`):
+**DEV** (a local worktree of the branch `chg-2026-067-site-draft-privacy`):
 1. Make the edits of section 3, and only those, in forward commits.
 2. Add the tests of section 4. Run `uv run pytest -q`. All pass.
-3. Run the export into a temp folder against a read-only copy of the warehouse (never into `public-data/`, never `scripts/publish-public-data.sh`). Compare with the current `public-data/v1`: the only content changes are 5 supplier cells (to masks), the district `profile` URLs (44), the new `counts` keys, the new `about` line, and the manifest hashes, sizes and time stamp.
+3. Run the export into a temp folder against a read-only copy of the warehouse (never into `public-data/`, never `scripts/publish-public-data.sh`). Compare with the current `public-data/v1`: the only content changes are 5 supplier cells (to masks), the `doc` cells of the same 5 rows (to null), the district `profile` URLs (44), the new `counts` keys, the new `about` line, and the manifest hashes, sizes and time stamp.
 4. POPIA check of the diff (popia-review). Grep the changed lines for names, ids, e-mail addresses and stale words.
 
 **TEST** (local, exact head):
@@ -178,7 +180,7 @@ Does it change which suppliers or people are flagged publicly? No. It reduces wh
 7. The orchestrator pushes the branch and opens the PR. Before the merge: tag `snapshot-YYYY-MM-DD-pre-pf-prNN` on the `main` commit, push the tag.
 8. Merge the PR (merge commit). GitHub Pages deploys from `main`.
 9. Tag `snapshot-YYYY-MM-DD-HHMM` (SAST) on the merge, run `python3 scripts/check_live.py`, and check by hand: DRAFT banner on `/`, the dashboard, `/privacy/` and a 404 path; a district profile link; the freshness column.
-10. The next nightly publish writes the masked award files and the new `counts`. Check the nightly report and the live `awards-*.json`: 0 unmasked titled values.
+10. The first nightly publish after the merge writes the masked award files and the new `counts` (Q4). Check the nightly report and the live `awards-*.json`: 0 unmasked titled values, and `doc` null on the 5 masked rows.
 
 ## 7. Claim check (each published claim against its source link)
 
@@ -210,10 +212,10 @@ The owner's rule of 17 Nov 2026 is to cite references and present everything exa
 | F-15 no-JS "Loading…" | In scope: one `<noscript>` note (3.1). |
 | F-16 `CNAME` and `.nojekyll` served | Deferred (GitHub Pages serves them; harmless). |
 | F-17 one meta description; PFMA link redirects | Deferred. |
-| F-18 `www` HTTPS | Deferred; DNS decision (Q5). |
+| F-18 `www` HTTPS | Deferred; revisited with the Q7 follow-up change if the hosting moves (Q5). |
 | N-1 (author) footer CPI source out of date | In scope (section 7). |
 | N-2 (author) hotline number without a source link | In scope (section 7). |
-| N-3 (author) GitHub Pages serves the whole repo root, including 14 review-app templates under `thusa/review/templates/` as `text/html` (for example `login.html`, 200) and the records as `text/markdown` | Deferred. These are not site pages, so they get no DRAFT label in this change. Q7. |
+| N-3 (author) GitHub Pages serves the whole repo root, including 14 review-app templates under `thusa/review/templates/` as `text/html` (for example `login.html`, 200) and the records as `text/markdown` | Follow-up change, out of scope here (Q7: the owner chose to serve only the site files from GitHub Pages, in a separate change). These are not site pages, so they get no DRAFT label in this change. |
 | N-4 (author) the same district URL bug in `thusa/detectors.py` and `thusa/report.py` | In scope with (a). |
 | About 2,057 short supplier strings | Out of scope; separate later review (3.4). |
 
@@ -232,7 +234,7 @@ The owner's rule of 17 Nov 2026 is to cite references and present everything exa
 
 Live, `origin/main` and the live skill were compared on 18 Nov 2026 at 05:20 SAST:
 - Live site vs `origin/main` `d688b031`: `index.html`, `apps/public-dashboard/index.html`, `robots.txt`, `public-data/v1/manifest.json` and `CNAME` are byte-identical (`cmp`).
-- Live skill `/home/box/agent-data/workflows/publicfunds-refresh/SKILL.md` vs `docs/bot/live-skill/publicfunds-refresh.MASTER.md`: byte-identical (sha256 `c80a5133…`). This change does not edit either.
+- The live skill (outside the repo) vs `docs/bot/live-skill/publicfunds-refresh.MASTER.md`: byte-identical (sha256 `c80a5133…`). This change does not edit either.
 
 | Duty (live today) | Where | After this change |
 |---|---|---|
@@ -267,19 +269,28 @@ No existing duty is removed or weakened.
 
 A new head needs new reviews. An agent's report of approval is not approval.
 
-## 12. Open questions for the owner
+## 12. Owner answers to the open questions
 
-- **Q1. Contact channel.** B (role mailbox on the site's domain, recommended), or A (public GitHub issue form, which reverses CHG-2026-012 item 2 and makes requests public), or both (A for corrections, B for removal).
-- **Q2. Responsible party.** What the privacy page says about who runs the site. The author proposes a role wording with no personal name. POPIA notice rules may expect more; the author does not give legal advice **[unverified]**.
-- **Q3. http audit-report links.** Keep the 2,351 official http links with the "http, official link" label (proposed), or hide them until a working HTTPS source exists.
-- **Q4. Timing and history.** Publish the masks at the next nightly run after the merge (proposed), or ask for a publish right after the merge. The 5 names stay in the public git history of earlier data commits; removing them needs a history rewrite and a force-push, which the project rules forbid.
-- **Q5. Real headers.** Put a proxy or CDN in front of GitHub Pages to send `frame-ancestors`, `nosniff` and Permissions-Policy (and decide on `www`, F-18), or accept the limits.
-- **Q6. Masked rows.** Keep `ocid`, `award_id`, `reference` and `doc` on masked rows (proposed for this change), or drop them as the watchers do.
-- **Q7. Served repo files.** Serve only the site files from GitHub Pages (a later change), or keep serving the repo root.
+Owner answers, 18 Nov 2026 05:40 SAST, as relayed by the orchestrator to the author. The record stays a draft. The merge and the deploy need the owner's GO naming the exact head.
+
+| Question | Answer | Where the plan follows it |
+|---|---|---|
+| Q1. Contact channel | A role mailbox on the site's own domain. No public issue link. | 3.2; tests (section 4) |
+| Q2. Responsible party | Named as a project or entity, not a person, with the role mailbox as contact. **[unverified]** until its legal standing is confirmed. | 3.2 item 7; tests |
+| Q3. http audit-report links | Keep the http Treasury links as found, labelled `http, official link`. | 3.3 (b) |
+| Q4. Timing and history | The masks take effect at the first nightly publish after the merge. No history rewrite. Earlier data commits keep the names. | 3.2 item 6; section 5; section 6 step 10 |
+| Q5. Real headers | The GitHub Pages header limits are accepted for now. Revisit them with Q7 if the hosting moves. | 3.3 (e); section 8 (F-18) |
+| Q6. Masked rows | Keep `ocid`, `award_id` and `reference`. Drop the `doc` link. | 3.4; tests; section 5 |
+| Q7. Served repo files | Serve only the site files from GitHub Pages, in a separate follow-up change. Out of scope here. | section 8 (N-3) |
 
 ## 13. POPIA review of this record
 
 popia-review: **PASS**. The record names no private person, no supplier name, no owner account and no agent. It gives counts, file names and masks of the form `D*****e` only. The 6 municipality names that begin with "Dr" are not written out.
+
+## Revisions
+
+- Rev 1 (18 Nov 2026, 05:45 SAST), after reviewer A's PASS with concerns on `0a21e0e0`: (1) the mask rule exempts `Inc` when a personal title leads the value, and organisation words match as whole words, case-insensitive; a recheck on the data gave 5 values (4 without the exception); (2) the record says that the export scan catches a lost or no-op mask, not a gap in the rule; (3) the privacy page plan has "Purpose and basis" and "Your rights" sections (POPIA section 18(1)); (4) box paths were replaced by role wording ("the live skill (outside the repo)", "a local worktree"). No code changed.
+- Rev 1, same commit: the owner's answers to Q1 to Q7 were recorded in section 12 (Owner answers, 18 Nov 2026 05:40 SAST, as relayed by the orchestrator to the author), and sections 3.2, 3.3 (b) and (e), 3.4, 4, 5, 6, 8 and the header were updated to match them (role mailbox only, no issue form; project named as responsible party, [unverified]; http links kept with a label; masks from the first nightly after the merge, no history rewrite; header limits accepted; `doc` dropped on masked rows; served-files change as a follow-up).
 
 ## Post-implementation review
 - Outcome: (written after the build, review and GO)
