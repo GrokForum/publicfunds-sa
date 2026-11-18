@@ -37,6 +37,67 @@ PHASES = {"Main appropriation": "main", "Adjusted appropriation": "adjusted", "F
 FORBIDDEN_KEYS = {"reviewer", "reviewer_id", "reviewer_name", "username", "notes", "note", "token", "password",
                   "person_id_hmac", "decided_by", "display_name", "session"}
 SA_ID = re.compile(r"(?<!\d)(\d{2})(\d{2})(\d{2})\d{7}(?!\d)")
+MUNI_PROFILE_BASE = "https://municipalmoney.gov.za/profiles/"
+
+# CHG-2026-067 item 4: supplier values that carry a personal title are masked in the award files.
+# A value is a titled person if, after removing outer brackets, it begins with a title (any case, optional full stop),
+# then a space and more text, and it holds no organisation word. Organisation words match as whole words, case-insensitive.
+# `Inc` does not count when a title leads the value (an SA Inc is a personal-liability company; its name is usually the
+# practitioner's own name), and the rule only applies when a title leads, so `Inc` never stops a mask.
+PERSON_TITLE = re.compile(r"(?:mr|mrs|ms|miss|mx|dr|prof|adv)\.?\s+\S", re.I)
+ORG_WORD = re.compile(r"(?<![0-9a-z])(?:pty|ltd|cc|inc|limited|municipality|trust|npc|soc|holdings|trading|enterprises?|"
+                      r"group|jv|joint\s+venture|t/a)(?![0-9a-z])", re.I)
+ORG_WORD_EXEMPT_AFTER_TITLE = {"inc"}
+MASKED_VALUE = re.compile(r"[0-9A-Z]\*{5}[0-9a-z]|\*{7}")
+
+
+def muni_profile_url(code: str, body_type: str | None) -> str:
+    """Municipal Money profile link (CHG-2026-067, F-03): districts are under district-CODE/, all others under
+    municipality-CODE/."""
+    kind = "district" if (body_type or "").lower() == "district" else "municipality"
+    return f"{MUNI_PROFILE_BASE}{kind}-{code}/"
+
+
+def _strip_outer_brackets(text: str) -> str:
+    s = text.strip()
+    while len(s) >= 2 and s[0] in "([" and s[-1] == {"(": ")", "[": "]"}[s[0]]:
+        s = s[1:-1].strip()
+    return s
+
+
+def _official_key(text: str) -> str:
+    return re.sub(r"\s+", " ", _strip_outer_brackets(text)).strip().lower()
+
+
+def is_titled_person(name: str | None, official_names: frozenset[str] | set[str] = frozenset()) -> bool:
+    """True if a supplier value carries a personal title and is not an organisation (CHG-2026-067 item 4).
+    `official_names` are the lower-case official municipality names: a supplier value equal to one is a public body,
+    never a person, so it is never masked."""
+    if not name:
+        return False
+    stem = _strip_outer_brackets(name)
+    if not PERSON_TITLE.match(stem):
+        return False
+    if _official_key(stem) in official_names:
+        return False
+    orgs = {re.sub(r"\s+", " ", m.group(0).lower()) for m in ORG_WORD.finditer(stem)}
+    return not (orgs - ORG_WORD_EXEMPT_AFTER_TITLE)
+
+
+def mask_value(text: str) -> str:
+    """The watchers' fixed-length mask: first letter or digit (upper case), five asterisks, last letter or digit
+    (lower case). Always 7 characters; fewer than two letters or digits gives '*******'."""
+    alnum = [c for c in text if c.isalnum()]
+    if len(alnum) < 2:
+        return "*******"
+    return alnum[0].upper() + "*****" + alnum[-1].lower()
+
+
+def mask_titled_person(name: str | None, official_names: frozenset[str] | set[str] = frozenset()) -> str | None:
+    """Mask a supplier value that carries a personal title; return any other value unchanged."""
+    if not is_titled_person(name, official_names):
+        return name
+    return mask_value(_strip_outer_brackets(name))
 
 
 class UnsafeExport(RuntimeError):
@@ -156,7 +217,7 @@ def municipalities(con, refs: SourceRefs) -> dict:
                     "miif_category": e["miif_category"],
                     "exists_from": str(e["valid_from"]) if e["valid_from"] else None,
                     "exists_to": str(e["valid_to"]) if e["valid_to"] else None,
-                    "profile": f"https://municipalmoney.gov.za/profiles/municipality-{e['code']}/",
+                    "profile": muni_profile_url(e["code"], e["body_type"]),
                     "years": {str(fye): d for fye, d in sorted(y.items())}})
     return {"schema": SCHEMA, "kind": "municipalities", "money_unit": "cents (ZAR)", "report_prefix": AUDIT_PREFIX,
             "audit_opinions": labels,
@@ -166,6 +227,8 @@ def municipalities(con, refs: SourceRefs) -> dict:
                       "basis: pub = total as published, sum = summed from published line items (KE-008).",
                       "years are keyed by financial-year end; audit.code labels are in audit_opinions.",
                       "audit.report: AGSA audit report link; prepend report_prefix unless it starts with http.",
+                      "audit.report paths under report_prefix are published by Municipal Money as http links; the https "
+                      "form does not serve the file (sample of 12, 18 Nov 2026).",
                       "null = unknown (not published or not loaded); never read it as zero."],
             "sources": used, "municipalities": out}
 
@@ -215,8 +278,15 @@ def coverage(con) -> dict:
                          for k, v in sorted(grid.items())]}
 
 
+def official_municipality_names(con) -> frozenset[str]:
+    """Lower-case official names (short and long) of all municipalities: never masked as a titled person."""
+    rows = con.execute("SELECT name, long_name FROM curated.gov_body WHERE sphere = 'local'").fetchall()
+    return frozenset(_official_key(v) for r in rows for v in r if v)
+
+
 def tenders(con, refs: SourceRefs, withheld_keys: set[str]) -> tuple[dict, dict[int, dict]]:
     used: dict = {}
+    official = official_municipality_names(con)
     awards = _rows(con, """SELECT a.*, coalesce(al.gov_body_id, a.buyer_gov_body_id) AS gb FROM curated.award a
         LEFT JOIN (SELECT DISTINCT buyer_id, gov_body_id FROM curated.buyer_alias) al USING (buyer_id)
         ORDER BY award_date, ocid, award_id""")
@@ -243,6 +313,9 @@ def tenders(con, refs: SourceRefs, withheld_keys: set[str]) -> tuple[dict, dict[
         if a["supplier_person_key"] in withheld_keys or a["supplier_key"] in withheld_keys:
             supplier = "(name withheld)"
         doc = _compact_doc(a["doc_url"])
+        masked = mask_titled_person(supplier, official)      # CHG-2026-067 item 4: after the withheld rule, before scrub()
+        if masked != supplier:
+            supplier, doc = masked, None                     # Q6: drop the doc link; ocid, award_id, reference and src stay
         per_year[yr or 0].append([a["ocid"], a["award_id"], a["award_date"].isoformat() if a["award_date"] else None,
                                   "signed" if a["award_date_basis"] == "contract.dateSigned" else "release",
                                   b, scrub(supplier), a["value_cents"] if not a["value_note"] else None, a["value_note"],
@@ -295,6 +368,25 @@ def tenders(con, refs: SourceRefs, withheld_keys: set[str]) -> tuple[dict, dict[
         f["sources"] = {k: used[k] for k in keys if k}
     summary["sources"] = used
     return summary, files
+
+
+SUPPLIER_COL = 5
+DOC_COL = 11
+
+
+def assert_no_titled_supplier(award_files: dict, official_names: frozenset[str] | set[str] = frozenset()) -> None:
+    """CHG-2026-067 fail-closed scan: no award supplier cell may still match the titled-person rule, and a masked row
+    must have no doc link. It uses the same rule as the mask, so it catches a mask that is lost or made a no-op, not a
+    gap in the rule."""
+    for y, f in award_files.items():
+        cols = f["columns"]
+        if cols[SUPPLIER_COL] != "supplier" or cols[DOC_COL] != "doc":
+            raise UnsafeExport(f"awards-{y}: unexpected columns {cols}")
+        for i, r in enumerate(f["rows"]):
+            if is_titled_person(r[SUPPLIER_COL], official_names):
+                raise UnsafeExport(f"awards-{y if y else 'undated'}.json rows[{i}]: supplier with a personal title is not masked")
+            if isinstance(r[SUPPLIER_COL], str) and MASKED_VALUE.fullmatch(r[SUPPLIER_COL]) and r[DOC_COL] is not None:
+                raise UnsafeExport(f"awards-{y if y else 'undated'}.json rows[{i}]: masked supplier row still has a doc link")
 
 
 def flags(paths: Paths, con) -> dict:
@@ -490,6 +582,7 @@ def export(paths: Paths, out_dir: Path | None = None) -> dict:
         mun, dep, cov = municipalities(con, refs), departments(con, refs), coverage(con)
         guard = _evidence_guard(out_dir, cov)      # CHG-2026-040: before anything is written; a fail leaves the published files as they are
         tsum, award_files = tenders(con, refs, withheld)
+        assert_no_titled_supplier(award_files, official_municipality_names(con))   # CHG-2026-067: fail closed
         fl, pr = flags(paths, con), prices(con, refs)
         payloads = {"municipalities.json": mun, "departments.json": dep, "coverage.json": cov,
                     "tenders-summary.json": tsum, "flags.json": fl, "prices.json": pr}
@@ -498,7 +591,10 @@ def export(paths: Paths, out_dir: Path | None = None) -> dict:
         for name, obj in payloads.items():
             assert_public_safe(obj, banned, name)
         blobs = {n: json.dumps(o, ensure_ascii=False, separators=(",", ":"), default=str).encode() for n, o in payloads.items()}
-        counts = {"municipalities": len(mun["municipalities"]), "departments": len(dep["departments"]),
+        counts = {"municipalities": len(mun["municipalities"]),
+                  "municipalities_current": sum(1 for m in mun["municipalities"] if not m["exists_to"]),
+                  "municipalities_ceased": sum(1 for m in mun["municipalities"] if m["exists_to"]),
+                  "departments": len(dep["departments"]),
                   "awards": sum(len(f["rows"]) for f in award_files.values()), "buyers": len(tsum["buyers"]),
                   "fuel_rows": len(pr["fuel"]["rows"]), "cpi_months": len(pr["cpi"]["rows"]),
                   "flags_confirmed": len(fl["confirmed"]), "leads_hidden": fl["hidden_leads"]["total"]}
@@ -534,7 +630,9 @@ def export(paths: Paths, out_dir: Path | None = None) -> dict:
 
 META_FILES = {"manifest.json", "changes.json", "feed.json"}
 CHANGES_KEEP = 100
-COUNT_LABELS = {"municipalities": "municipalities", "departments": "national departments", "awards": "tender award records",
+COUNT_LABELS = {"municipalities": "municipalities", "municipalities_current": "municipalities that exist now",
+                "municipalities_ceased": "municipalities with an end date in the source data",
+                "departments": "national departments", "awards": "tender award records",
                 "buyers": "buyers with awards", "fuel_rows": "fuel price rows", "cpi_months": "CPI months",
                 "flags_confirmed": "confirmed flags", "leads_hidden": "hidden leads awaiting review"}
 

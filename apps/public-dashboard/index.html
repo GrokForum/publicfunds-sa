@@ -4,15 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:,">
 <meta name="description" content="PublicFunds SA: where South African public money goes, from official open data - with the gaps shown honestly.">
-<title>PublicFunds SA - follow South Africa's public money</title>
+<title>DRAFT · PublicFunds SA - follow South Africa's public money</title>
 <link rel="canonical" href="https://publicfunds.grokforum.site/apps/public-dashboard/">
 <meta name="theme-color" content="#0b6e4f">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PublicFunds SA">
-<meta property="og:title" content="PublicFunds SA - follow South Africa's public money">
+<meta property="og:title" content="DRAFT · PublicFunds SA - follow South Africa's public money">
 <meta property="og:description" content="Budgets, spending, audit results and tenders for every municipality and national department, from official open data - with the gaps shown.">
 <meta property="og:url" content="https://publicfunds.grokforum.site/apps/public-dashboard/">
 <meta property="og:image" content="https://publicfunds.grokforum.site/apps/public-dashboard/og-card.png">
@@ -20,7 +21,7 @@
 <meta property="og:image:alt" content="PublicFunds SA: follow South Africa's public money. Indicators, not findings.">
 <meta property="og:locale" content="en_ZA">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PublicFunds SA - follow South Africa's public money">
+<meta name="twitter:title" content="DRAFT · PublicFunds SA - follow South Africa's public money">
 <meta name="twitter:description" content="Budgets, spending, audits and tenders from official open data, with the gaps shown.">
 <meta name="twitter:image" content="https://publicfunds.grokforum.site/apps/public-dashboard/og-card.png">
 <link rel="alternate" type="application/feed+json" title="PublicFunds SA: new public data" href="../../public-data/v1/feed.json">
@@ -83,10 +84,12 @@ details summary{cursor:pointer;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{header,nav,.tools,.btn-csv,footer{display:none}}
 .reportcard{max-width:760px;border-top:6px solid var(--brand)}
+.draft{background:#4a1d0a;color:#fff;font-size:.92rem}.draft p{max-width:1100px;margin:0 auto;padding:.45rem 1rem}.draft a{color:#fff;text-decoration:underline}
 </style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
+<div class="draft" role="note"><p><strong>DRAFT.</strong> This site is a draft. It is built only from the public record: official published data, shown as found, with each source cited. <a href="/privacy/">Privacy and contact</a></p></div>
 <header>
   <div class="bar"><a class="brand" href="#/">PublicFunds SA <small>follow the public money</small></a>
     <button id="navtoggle" aria-expanded="false" aria-controls="nav">Menu</button></div>
@@ -96,21 +99,31 @@ details summary{cursor:pointer;font-weight:600}
     <li><a href="#/tools">Tools</a></li><li><a href="#/unknowns">Known unknowns</a></li><li><a href="#/changes">What's new</a></li><li><a href="#/sources">Sources &amp; method</a></li><li><a href="#/glossary">Glossary</a></li></ul></nav>
 </header>
 <div class="notice" role="note"><p><b>Indicators, not findings.</b> This site shows official public data as published, gaps included. Blank or "unknown" means the figure is not available, never zero. Flags are automated indicators that people check; only flags confirmed by review are shown.</p></div>
-<main id="main" tabindex="-1"><div id="view" aria-live="polite" aria-busy="true"><p>Loading…</p></div></main>
-<footer><p id="foot">PublicFunds SA uses official open data from National Treasury, the Auditor-General (via Municipal Money), eTenders, the Department of Mineral and Petroleum Resources and Statistics South Africa (via the OECD). Open data: <a href="../../public-data/v1/manifest.json">public-data/v1</a>.</p>
-<p>To report suspected corruption, call the National Anti-Corruption Hotline: 0800 701 701. · <a href="#/changes">What's new</a> · <a id="feedlink" href="../../public-data/v1/feed.json">Data feed (JSON Feed)</a></p></footer>
+<main id="main" tabindex="-1"><div id="view" aria-live="polite" aria-busy="true"><p>Loading…</p><noscript><p>The interactive views need JavaScript. The open data is at <a href="../../public-data/v1/manifest.json">public-data/v1/manifest.json</a>.</p></noscript></div></main>
+<footer><p id="foot">PublicFunds SA uses official open data from National Treasury, the Auditor-General (via Municipal Money), eTenders, the Department of Mineral and Petroleum Resources and Statistics South Africa (via the IMF and the OECD). Open data: <a href="../../public-data/v1/manifest.json">public-data/v1</a>.</p>
+<p>To report suspected corruption, call the National Anti-Corruption Hotline: 0800 701 701 (<a href="https://www.gov.za/faq/justice-and-crime-prevention/how-do-i-report-fraud-or-corruption-state-department-or-state">source: gov.za</a>). · <a href="#/changes">What's new</a> · <a id="feedlink" href="../../public-data/v1/feed.json">Data feed (JSON Feed)</a> · <a href="/privacy/">Privacy and contact</a></p></footer>
 <script>
 "use strict";
 /* ---------------------------------------------------------------- config */
 /* Data location: ?data=<url> or window.PUBLICFUNDS_DATA_BASE override; otherwise the copy deployed alongside the app
    (same origin, relative path ../../public-data/v1/). */
-const CANDIDATES = (() => {
-  const q = new URLSearchParams(location.search).get("data") || window.PUBLICFUNDS_DATA_BASE;
-  const norm = v => { try { const u = new URL(v, location.href); if (!/^https?:$/.test(u.protocol)) return null; return u.href.replace(/\/?$/, "/"); } catch (e) { return null; } };
-  if (q && norm(q)) return [norm(q)];
+/* database:begin */
+/* CHG-2026-067 (F-08): ?data= or window.PUBLICFUNDS_DATA_BASE is used only if it is on the page's own origin; anything else is
+   ignored and the default same-origin path is used. tests/test_site_draft_privacy.py runs this block in node. */
+function dataBase(v, pageHref) {
+  const page = new URL(pageHref);
   // Same origin: the app is served from the repo layout, so the data sits two levels up.
-  return [new URL(location.pathname.includes("/apps/public-dashboard/") ? "../../public-data/v1/" : "./public-data/v1/", location.href).href];
-})();
+  const def = new URL(page.pathname.includes("/apps/public-dashboard/") ? "../../public-data/v1/" : "./public-data/v1/", page.href).href;
+  if (v == null || v === "") return def;
+  try {
+    const u = new URL(String(v), page.href);
+    if (u.origin !== page.origin || !/^https?:$/.test(u.protocol)) return def;
+    u.search = ""; u.hash = "";
+    return u.href.replace(/\/?$/, "/");
+  } catch (e) { return def; }
+}
+/* database:end */
+const CANDIDATES = [dataBase(new URLSearchParams(location.search).get("data") || window.PUBLICFUNDS_DATA_BASE, location.href)];
 let BASE = CANDIDATES[0];
 const PROVINCES = {EC:"Eastern Cape",FS:"Free State",GT:"Gauteng",KZN:"KwaZulu-Natal",LP:"Limpopo",MP:"Mpumalanga",NC:"Northern Cape",NW:"North West",WC:"Western Cape"};
 const TYPES = {metro:"Metro",local:"Local municipality",district:"District municipality"};
@@ -300,10 +313,32 @@ async function loadAwards() {
 }
 function awardDoc(file, d) { if (!d) return null; if (/^https?:/.test(d)) return d; const [b, f] = d.split("|"); return file.doc_prefix + b + (f != null ? "&downloadedFileName=" + encodeURIComponent(f) : ""); }
 
+/* ---------------------------------------------------------------- freshness (CHG-2026-067, F-05) */
+/* The pill follows itil/sla-slo.md: source age = now minus the last successful check, not the last new data.
+   tests/test_site_draft_privacy.py runs this block in node: keep the markers, keep the block self-contained. */
+/* fresh:begin */
+function freshDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleDateString("en-ZA", {timeZone: "Africa/Johannesburg", day: "numeric", month: "short", year: "numeric"}); }
+function freshPill(s, nowMs) {
+  const slo = s.freshness_slo_days;
+  if (!slo) return {cls: null, text: "no target"};
+  if (!s.last_checked_sast) return {cls: "mid", text: "not checked yet"};
+  if (/failed|blocked/.test(s.last_run_status || "")) return {cls: "bad", text: "last check failed"};
+  const t = Date.parse(s.last_checked_sast);
+  if (isNaN(t)) return {cls: "mid", text: "not checked yet"};
+  if ((nowMs - t) / 864e5 > slo) return {cls: "bad", text: `stale: last checked ${freshDate(s.last_checked_sast)} (target ${slo} days)`};
+  return {cls: "ok", text: `checked ${freshDate(s.last_checked_sast)}`};
+}
+function noNewDataNote(s, nowMs) {
+  const slo = s.freshness_slo_days, t = s.last_new_data_sast ? Date.parse(s.last_new_data_sast) : NaN;
+  if (!slo || isNaN(t) || (nowMs - t) / 864e5 <= slo) return null;
+  return `no new data from the source since ${freshDate(s.last_new_data_sast)}`;
+}
+/* fresh:end */
+
 /* ---------------------------------------------------------------- views */
 const view = () => $("#view");
 function setView(title, ...kids) {
-  document.title = title + " · PublicFunds SA";
+  document.title = "DRAFT · " + title + " · PublicFunds SA";
   const v = view(); v.replaceChildren(el("h1", {}, title), ...kids); v.setAttribute("aria-busy", "false");
 }
 function errorBox(e) { return el("div", {class: "card err"}, el("b", {}, "Couldn't load the data. "), String(e.message || e),
@@ -319,9 +354,11 @@ async function vHome() {
   setView("Where does South Africa's public money go?",
     el("p", {class: "lead"}, "Budgets, spending, audit results and tenders for every municipality and national department - from official open data, with what is missing shown as clearly as what is there."),
     el("div", {class: "grid"},
-      kp(c.complete_pct == null ? "unknown" : pctPoints(c.complete_pct, 1), `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
+      kp(c.complete_pct == null ? "unknown" : pctPoints(c.complete_pct, 1), `of municipality-years have complete core data (${intg(c.complete)} of ${intg(c.applicable)} municipality-years; ${intg(c.entities)} municipalities with core data due, ${fyLabel(c.fye_min)}–${fyLabel(c.fye_max)})`),
       gap,
-      kp(intg(ctr.municipalities), "municipalities and districts"),
+      kp(intg(ctr.municipalities), ctr.municipalities_current != null && ctr.municipalities_ceased != null
+        ? `municipalities and districts in the records: ${intg(ctr.municipalities_current)} exist now, ${intg(ctr.municipalities_ceased)} have an end date in the source data`
+        : "municipalities and districts"),
       kp(intg(ctr.departments), "national departments with budget data"),
       kp(intg(ctr.awards), "tender award records"),
       kp(intg(ctr.flags_confirmed), `flags confirmed by review · ${intg(ctr.leads_hidden)} automated leads still being checked (hidden)`)),
@@ -330,12 +367,10 @@ async function vHome() {
       el("p", {class: "small muted"}, `Build ${m.build.id} · data-quality checks: ${intg(m.build.data_quality.pass)} passed, ${intg(m.build.data_quality.warn)} warning(s), ${intg(m.build.data_quality.fail)} failed.`),
       table("Last new data per source", [
         {label: "Source", render: s => s.name || s.id, value: s => s.name || s.id},
-        {label: "Last new data", render: s => s.last_new_data_sast ? dateSast(s.last_new_data_sast) : unknown("none yet"), value: s => s.last_new_data_sast},
-        {label: "Freshness", render: s => {
-          const age = s.last_new_data_sast ? (Date.now() - Date.parse(s.last_new_data_sast)) / 864e5 : null;
-          if (age == null || !s.freshness_slo_days) return unknown("no target");
-          return age > s.freshness_slo_days ? el("span", {class: "pill bad"}, `stale (target ${s.freshness_slo_days} days)`) : el("span", {class: "pill ok"}, `within ${s.freshness_slo_days}-day target`);
-        }, value: s => s.freshness_slo_days || ""},
+        {label: "Last new data", render: s => { if (!s.last_new_data_sast) return unknown("none yet"); const nn = noNewDataNote(s, Date.now());
+          return nn ? el("span", {}, dateSast(s.last_new_data_sast), el("span", {class: "nn"}, nn)) : dateSast(s.last_new_data_sast); }, value: s => s.last_new_data_sast},
+        {label: "Freshness", render: s => { const f = freshPill(s, Date.now()); return f.cls ? el("span", {class: "pill " + f.cls}, f.text) : unknown(f.text); },
+         value: s => s.freshness_slo_days || ""},
         {label: "Status", render: s => s.last_run_status ? el("span", {class: "pill " + (/^(ok|unchanged)$/.test(s.last_run_status) ? "ok" : "mid")}, s.last_run_status) : unknown("not loaded"), value: s => s.last_run_status || "not loaded"}],
         m.sources, "sources-freshness.csv")),
     el("h2", {}, "What we don't know"),
@@ -470,7 +505,8 @@ async function vMunicipality(id) {
     el("p", {class: "small muted"}, "From the Auditor-General. Best to worst: unqualified with no findings ('clean'), unqualified with findings, qualified, adverse, disclaimer. 'Outstanding' means the audit was not finished."),
     table("Audit opinion history", [
       {label: "Year", value: r => fyLabel(r.y)}, {label: "Opinion", render: r => opinionChip(r.d.audit.code, mun.audit_opinions), value: r => mun.audit_opinions[r.d.audit.code]},
-      {label: "Audit report", render: r => r.d.audit.report ? link(/^https?:/.test(r.d.audit.report) ? r.d.audit.report : mun.report_prefix + r.d.audit.report, "report") : unknown("none"),
+      {label: "Audit report", render: r => r.d.audit.report ? (/^https?:/.test(r.d.audit.report) ? link(r.d.audit.report, "report")
+        : link(mun.report_prefix + r.d.audit.report, "report (http, official link)", {title: "Official link as published by Municipal Money. The HTTPS form of this address does not serve the file."})) : unknown("none"),
        value: r => r.d.audit.report ? (/^https?:/.test(r.d.audit.report) ? r.d.audit.report : mun.report_prefix + r.d.audit.report) : ""},
       {label: "Source", render: r => srcLink(mun, r.d.audit.src), csvValue: r => srcUrl(mun, r.d.audit.src), csv: "source_url"}], audits.slice().reverse(), `${m.code}-audit-opinions.csv`),
     el("h2", {}, "Tenders"),
