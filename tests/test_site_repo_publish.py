@@ -462,3 +462,17 @@ def test_private_settings_env_first_then_config(tmp_path):
     cfg.write_text("not json")
     assert sr.private_settings({}, cfg) == dict.fromkeys(sr.CONFIG_KEYS)
     assert sr.PRIVATE_CONFIG.parts[-3:] == (".config", "thusa", "site-publish.json")
+
+
+def test_site_commit_uses_the_neutral_role_identity(env, monkeypatch):
+    """Owner decision, 18 Nov 2026: author and committer of a site commit are the neutral role identity."""
+    for k in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+        monkeypatch.setenv(k, "Grok Bot (for the owner)" if k.endswith("NAME") else "grokbot@localhost")
+    r = run_publish(env)
+    assert r.code == 0, r.lines
+    new = site_main(env)
+    fmt = git(env["tmp"], f"--git-dir={env['site']}", "log", "-1", "--format=%an|%ae|%cn|%ce", new)
+    assert fmt == "PublicFunds publisher|noreply@publicfunds.grokforum.site|PublicFunds publisher|noreply@publicfunds.grokforum.site"
+    raw = git(env["tmp"], f"--git-dir={env['site']}", "cat-file", "commit", new)
+    assert "grok bot" not in raw.lower() and "grokbot" not in raw.lower()
+    assert "Grok Bot" not in (ROOT / "thusa" / "site_repo.py").read_text()

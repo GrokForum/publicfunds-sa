@@ -58,8 +58,11 @@ REQUIRED = ALLOWLIST | {DATA_PREFIX + "manifest.json", DATA_PREFIX + "feed.json"
 
 EXIT_OK, EXIT_BLOCKED, EXIT_FAILED = 0, 3, 4
 GIT_TIMEOUT_S = 300
-IDENTITY = {"GIT_AUTHOR_NAME": "Grok Bot (for the owner)", "GIT_AUTHOR_EMAIL": "grokbot@localhost",
-            "GIT_COMMITTER_NAME": "Grok Bot (for the owner)", "GIT_COMMITTER_EMAIL": "grokbot@localhost"}
+# Site-repository commits use a neutral role identity (owner decision, 18 Nov 2026), never a bot identity.
+SITE_AUTHOR_NAME = "PublicFunds publisher"
+SITE_AUTHOR_EMAIL = "noreply@publicfunds.grokforum.site"
+IDENTITY = {"GIT_AUTHOR_NAME": SITE_AUTHOR_NAME, "GIT_AUTHOR_EMAIL": SITE_AUTHOR_EMAIL,
+            "GIT_COMMITTER_NAME": SITE_AUTHOR_NAME, "GIT_COMMITTER_EMAIL": SITE_AUTHOR_EMAIL}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")

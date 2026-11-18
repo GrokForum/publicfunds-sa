@@ -27,10 +27,12 @@ This change does exactly the S11 scope: a site publish helper, the live check wr
 | `docs/bot/live-skill/routine-nightly.PROPOSED.md` | The proposed routine prompt: step 4 order, the site push scope, the site ACTION lines in the quiet rule and in the report order, the site push exit code in the report. |
 | `docs/bot/live-skill/publicfunds-refresh.PREVIOUS-CHG-2026-066.md` (new) | Byte copy of the CHG-2026-066 master that is live (sha256 `c80a5133…`), as the rollback text. |
 | `docs/bot/live-skill/README.md` | The new file, the step 4 order, the private config deploy step, the drift check and the rollback. |
-| `tests/test_site_repo_publish.py` (new) | 65 tests with temporary local bare repositories and no network. |
+| `tests/test_site_repo_publish.py` (new) | 66 tests with temporary local bare repositories and no network. |
 | `tests/test_nightly_check_live.py` | The site push input and its matrix; `RAW_URL` on the site repository. |
 | `tests/test_live_skill_snapshot.py` | The 7 edits as `CHG070_EDITS`; the order check includes the site push; the drift check also accepts the previous master; checks for the site push rules and their must-fail cases. |
 | `tests/test_robots_noindex.py`, `tests/test_site_draft_privacy.py` | The expected `CNAME` and the site domain come from `thusa/site_repo.py`. The data-repository `CNAME` file is checked only while it exists, so the tests pass before and after that file is removed. |
+
+Site-repository commits use the neutral role identity `PublicFunds publisher` <`noreply@publicfunds.grokforum.site`> as author and committer (owner decision, 18 Nov 2026). Commits to this data repository keep their usual identity.
 
 The private list, its path, the tip file and the private config are not in git. The helper reads them from `PF_TITLED_VALUES_FILE`, `PF_SITE_TIP_FILE` and `PF_SITE_BUNDLE_DIR`, or else from `~/.config/thusa/site-publish.json`. If it cannot read the list or the tip, the run is blocked.
 
@@ -60,7 +62,7 @@ The first site push after the deploy is the 20 Nov 2026 03:00 SAST nightly. It a
 
 ## 5. Testing
 
-- Full test suite on the branch: 1170 passed, 61 skipped (18 Nov 2026 13:17 SAST).
+- Full test suite on the branch: 1171 passed, 61 skipped (18 Nov 2026 13:35 SAST).
 - `tests/test_site_repo_publish.py`: gate 8 (the recorded tip; the tip plus a `CNAME`-only commit with and without LF; CRLF, CR, two LFs, another domain, an extra line, a leading space, an extra file, executable mode, a modified `CNAME`, two commits and an unknown tip are rejected; a remote with no `main`; a failed fetch), the tree-hash check, staging with `CNAME` with and without a data-repository `CNAME` file, the allowlist, the mask scan and POPIA failures that block the push, a refused push, a tip that was not recorded, the private bundle, the guards.
 - `tests/test_nightly_check_live.py`: 83 passed, including the site push matrix in section 3.
 - A dry run on 18 Nov 2026, in temporary copies only (no push to GitHub): the export of this branch, from a copy of the warehouse, into a scratch clone; the helper with the real private list against a local bare repository that held a root commit and a GitHub-style `CNAME` commit without LF. Result: the gates passed, 27 files, `site_publish: pushed`, then `site_publish: no change; nothing pushed` on the second run. The same helper on today's `main` data (before the first masked nightly) was blocked by the mask scan in 4 award files. The scratch copies were deleted.
