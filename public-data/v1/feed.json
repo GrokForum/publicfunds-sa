@@ -7,6 +7,13 @@
  "language": "en-ZA",
  "items": [
   {
+   "id": "B20261119T012339Z-d82739ff26a8b789",
+   "url": "https://publicfunds.grokforum.site/apps/public-dashboard/#/changes",
+   "title": "New public data: build B20261119T012339Z",
+   "content_text": "Figures updated or corrected in: awards-2021.json, awards-2023.json, awards-2024.json, awards-2025.json, departments.json, municipalities.json, prices.json.",
+   "date_published": "2026-11-19T03:27:52+02:00"
+  },
+  {
    "id": "B20261118T012055Z-eb8ea675c46e9e2f",
    "url": "https://publicfunds.grokforum.site/apps/public-dashboard/#/changes",
    "title": "New public data: build B20261118T012055Z",
