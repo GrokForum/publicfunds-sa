@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | The orchestrator, 20 Nov 2026 20:21 SAST, as reported to the author (PublicFunds). |
+| Requested by / date (SAST) | The orchestrator, 20 Nov 2026 20:21 SAST, as reported to the author. |
 | Status | Built in DEV on branch `docs-source-pack-plan` from `main` `b21990a5f1251841efb52619631b44e76d0cef8d` (20 Nov 2026). |
 | Type | Standard (docs only). |
 | Environment | Records and planning docs only. No code or data change. No ingest. |
