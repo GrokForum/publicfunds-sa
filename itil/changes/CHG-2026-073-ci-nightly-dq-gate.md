@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Requested by / date (SAST) | The orchestrator, 20 Nov 2026 20:21 SAST, as reported to the author (PublicFunds). |
+| Requested by / date (SAST) | The orchestrator, 20 Nov 2026 20:21 SAST, as reported to the author. |
 | Status | Built in DEV on branch `ci-nightly-dq-gate` from `main` `b21990a5f1251841efb52619631b44e76d0cef8d` (20 Nov 2026). |
 | Type | **Normal-high** (`itil/change-enablement.md`: CI workflow files). |
 | Environment | DEV (worktree). Pre-change `main` is `b21990a5f1251841efb52619631b44e76d0cef8d`. The workflow runs on GitHub Actions only after a merge. It does not publish and does not push. |
