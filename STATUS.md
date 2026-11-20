@@ -1,7 +1,8 @@
-# STATUS (as of 2026-11-18)
+# STATUS (as of 2026-11-19)
 
-## Current (18 Nov 2026)
+## Current (19 Nov 2026)
 
+- CHG-2026-071 (19 Nov 2026, records): the owner named the site-only fresh repository publicfunds-web, 19 Nov 2026 21:18 SAST, given in the orchestrator's chat and verified by the author. Repository creation and a seed push take place only after an owner GO that names the seed tree. The live site repository remains GrokForum/publicfunds-site (CHG-2026-069 / CHG-2026-070). Record: `itil/changes/CHG-2026-071-publicfunds-web-name.md`.
 - Merged and live: CHG-2026-063 (PR #12, hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag): merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129` (pre-change tag `snapshot-2026-11-17-pre-chg063`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Live `robots.txt` HTTP 200 with the exact content and `check_live` OK at 11:30 SAST. Rollback: `git revert -m 1 de37f666`.
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
 - Live data build: B20261118T012055Z, generated 18 Nov 2026 03:23 SAST (the 18 Nov 2026 nightly). check_live on 18 Nov 2026 at 09:50 SAST reported the site serving that build, with data 6.5 h old.
