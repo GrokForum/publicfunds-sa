@@ -13,12 +13,15 @@ from pathlib import Path
 
 import pytest
 
+from thusa import site_repo
+
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = {"index.html": ROOT / "index.html", "apps/public-dashboard/index.html": ROOT / "apps/public-dashboard/index.html",
          "404.html": ROOT / "404.html", "privacy/index.html": ROOT / "privacy/index.html"}
 APP = PAGES["apps/public-dashboard/index.html"]
 PRIVACY = PAGES["privacy/index.html"]
-SITE_DOMAIN = (ROOT / "CNAME").read_text().strip()
+# CHG-2026-070: the site domain comes from the site-repository source of truth, not from the data-repository CNAME file.
+SITE_DOMAIN = site_repo.EXPECTED_CNAME.decode("ascii").strip()
 BANNER = ("<strong>DRAFT.</strong> This site is a draft. It is built only from the public record: official published data, "
           "shown as found, with each source cited.")
 ROBOTS = '<meta name="robots" content="noindex, nofollow">'
@@ -349,3 +352,10 @@ def test_http_audit_links_labelled_and_counts_labels():
     assert "municipalities and districts in the records: ${intg(ctr.municipalities_current)} exist now, " \
            "${intg(ctr.municipalities_ceased)} have an end date in the source data" in html
     assert "municipalities with core data due, ${fyLabel(c.fye_min)}" in html
+
+
+def test_site_domain_source_of_truth():
+    """CHG-2026-070: SITE_DOMAIN is the site-repository CNAME; the data-repository CNAME, while it exists, agrees."""
+    assert SITE_DOMAIN == "publicfunds.grokforum.site" == site_repo.SITE_DOMAIN
+    if (ROOT / "CNAME").exists():
+        assert (ROOT / "CNAME").read_bytes() == site_repo.EXPECTED_CNAME
