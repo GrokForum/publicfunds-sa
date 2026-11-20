@@ -4,6 +4,8 @@ Owner request 19 Oct 2026 21:41 SAST ([owner instruction; exact words in the pri
 public-expenditure source for South African taxpayers that knows what it doesn't know, flags exceptions (e.g. diesel bought at R123/l when the
 official price was about R24/l), tracks irregular / fruitless & wasteful expenditure and looting, with benchmarks "on the glass".
 
+See also: `docs/roadmap/source-pack-plan-2026-11.md` (20 Nov 2026), a plan that maps further official sources to CSI-026, CSI-029, CSI-030, CSI-035, CSI-037, CSI-039 and CSI-046. That plan does not ingest data.
+
 ## Scoring
 
 | Factor | Scale |
