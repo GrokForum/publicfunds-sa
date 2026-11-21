@@ -1,0 +1,47 @@
+# Check-only nightly: tests, published-data quality gate, live-site check.
+# Runs after the box 03:00 SAST publish (04:30 SAST = 02:30 UTC). Does not push or publish.
+# Does not use stored credentials or a publish token. Does not conflict with the box nightly.
+name: nightly-dq-gate
+
+"on":
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-dq-gate
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: tests-dq-gate-check-live
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install pinned dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Run test suite
+        run: uv run pytest -q
+
+      - name: Data-quality gate on published data
+        run: uv run python scripts/ci_published_dq_gate.py --live
+
+      - name: Live-site check
+        run: python3 scripts/ci_check_live.py

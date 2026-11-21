@@ -2,6 +2,7 @@
 
 ## Current (18 Nov 2026)
 
+- CHG-2026-073 (20 Nov 2026, DEV): check-only GitHub Actions workflow `nightly-dq-gate` (04:30 SAST / 02:30 UTC, and `workflow_dispatch`). It installs pinned dependencies, runs the tests, runs the published-data quality gate, and runs the live-site check. The run fails on a gate failure or a BREACH. Permissions are `contents: read`. No stored credentials, no push, and no publish. Actions are pinned by full SHA. Built on branch `ci-nightly-dq-gate` from `main` `b21990a5`. Tests: 1,067 passed, 61 skipped (20:34 SAST). Record: `itil/changes/CHG-2026-073-ci-nightly-dq-gate.md`.
 - Merged and live: CHG-2026-063 (PR #12, hide the site from search engines: `robots.txt` with `Disallow: /` and a `noindex, nofollow` meta tag): merge `de37f666`, 17 Nov 2026 11:29 SAST, exact head `3c93c88d`, tag `snapshot-2026-11-17-1129` (pre-change tag `snapshot-2026-11-17-pre-chg063`). Merged by the orchestrator on an owner instruction as reported to the author (PublicFunds), 17 Nov 2026. The PR shows no reviews. Live `robots.txt` HTTP 200 with the exact content and `check_live` OK at 11:30 SAST. Rollback: `git revert -m 1 de37f666`.
 - Live site: https://publicfunds.grokforum.site/ (GitHub Pages from `main`).
 - Live data build: B20261118T012055Z, generated 18 Nov 2026 03:23 SAST (the 18 Nov 2026 nightly). check_live on 18 Nov 2026 at 09:50 SAST reported the site serving that build, with data 6.5 h old.
